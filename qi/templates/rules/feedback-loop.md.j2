@@ -1,0 +1,38 @@
+# Rule: AI Feedback Loop
+
+After every QA session, before closing the ticket:
+
+## Mandatory debrief (5 minutes)
+
+1. Where did the AI get it wrong? (wrong locator, wrong env assumption, wrong AC interpretation)
+2. What was missing from the constitution? (rule not written, skill not covering this case)
+3. What did the AI surface that you didn't know? (new pattern, new failure mode)
+
+## How to codify findings
+
+| Finding type | Where it goes |
+|---|---|
+| AI violated a constraint repeatedly | New or updated entry in `.claude/rules/` |
+| AI didn't know a procedure | New or updated skill in `.claude/skills/` |
+| Missing domain knowledge | Add to `CLAUDE.md` or `specs/<domain>.md` |
+| New failure pattern found | Add to `WATCH_CANDIDATES.md` |
+
+## Watch-agent candidate log
+
+When manual triage finds a pattern that could be automated, log it in `WATCH_CANDIDATES.md`:
+
+```
+## Candidate: <pattern name>
+- **What it detects:** <description>
+- **How we find it now:** <manual steps>
+- **Signal:** <what DB field / log line / queue state indicates the failure>
+- **Found on:** <date>
+```
+
+Don't build the agent immediately. Log the candidate, accumulate patterns, build when
+there are 3+ confirmed occurrences.
+
+## The metric
+
+Constitution improvements per sprint — not tickets per sprint. A ticket that teaches the
+constitution something is worth more than three that don't.

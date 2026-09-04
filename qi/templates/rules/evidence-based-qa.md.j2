@@ -1,0 +1,46 @@
+# Rule: Evidence-Based Verification
+
+Every QA pass or fail must be backed by concrete evidence. "Looks right" is not verification.
+
+## What counts as evidence
+
+{% if has_cloud %}
+- A specific {{ cloud_label }} log line (timestamp + endpoint + status + actor)
+{% endif %}
+{% if has_nosql %}
+- A {{ nosql_dbs | join(' / ') | title }} document showing the actual field value
+{% endif %}
+{% if has_sql %}
+- A SQL query result showing the expected state in {{ sql_dbs | join(' / ') | title }}
+{% endif %}
+{% if ui_web %}
+- A screenshot of the rendered UI tied to the acceptance criterion
+{% endif %}
+{% if ui_mobile_ios or ui_mobile_android %}
+- A mobile screenshot tied to the acceptance criterion
+{% endif %}
+- An API response body or HTTP status code logged during the test
+
+## What does NOT count
+
+- "The test passed" without citing what was observed
+- "I navigated to the page and it looked correct"
+- A green test report without a log line, DB confirmation, or screenshot
+
+## Report format
+
+Every verification session must produce a structured table:
+
+| # | AC | Test Case | Result | Evidence |
+|---|---|---|---|---|
+| TC-1 | AC1 | description | ✅ Pass / ❌ Fail | `specific log line or query result` |
+
+## Before declaring a ticket QA PASS
+
+- [ ] Every acceptance criterion has at least one evidence row
+- [ ] At least one backend source was queried (DB, API response, or log line)
+{% if ui_web or ui_mobile_ios or ui_mobile_android %}
+- [ ] A screenshot was taken for any UI-facing AC
+{% endif %}
+- [ ] The ticket comment draft was shown to the QA engineer before posting
+- [ ] The ticket transition was confirmed by the QA engineer before executing

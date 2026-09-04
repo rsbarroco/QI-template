@@ -1,0 +1,54 @@
+# Rule: Connection Validation at Ticket Intake
+
+Run this check **before Step 1 of ticket-intake** — before the sprint tracking record is
+opened and before any gap analysis or doc lookup. A missing connector discovered
+mid-execution wastes a full investigation cycle.
+
+## Required connectors per ticket type
+
+| Connector | Purpose | How to verify |
+|---|---|---|
+| **{{ tracker_label }}** | Fetch ACs, post comments, move status | Auth check / list projects |
+{% if has_sql %}
+{% for db in sql_dbs %}
+| **{{ db | title }}** | DB assertions on dev/staging | `SELECT 1` |
+{% endfor %}
+{% endif %}
+{% if has_nosql %}
+{% for db in nosql_dbs %}
+| **{{ db | title }}** | NoSQL assertions | Ping / list collections |
+{% endfor %}
+{% endif %}
+{% if ui_web %}
+| **Playwright / Browser MCP** | Browser automation, UI verification | `browser_snapshot` on a neutral URL |
+{% endif %}
+{% if ui_mobile_ios or ui_mobile_android %}
+| **Appium** | Mobile UI automation | `appium_session_management` |
+{% endif %}
+| **GitHub** | Branch creation, PR operations | List open PRs |
+{% if cloud == 'aws' %}
+| **AWS** | CloudWatch logs, SQS operations | `aws_whoami` |
+{% elif cloud == 'gcp' %}
+| **GCP** | Cloud Run logs, Pub/Sub | `list-projects` |
+{% elif cloud == 'azure' %}
+| **Azure** | Azure Monitor, Service Bus | Subscription list |
+{% endif %}
+
+## Minimum viable set to proceed
+
+**{{ tracker_label }}** + at least one DB connector + at least one UI connector (if
+the ticket has a UI surface). Document what was skipped when proceeding without a connector.
+
+## What to do when a connector is down
+
+1. Try a ToolSearch — a deferred tool may appear once the server connects.
+2. For MCP servers: reconnect via your MCP client (FleetView, Claude Code settings).
+3. Re-source your `.env` and retry before concluding a connector is unavailable.
+4. If still down: list which validations will be skipped and continue with the minimum
+   viable set.
+
+## When to re-run this check
+
+Re-validate connections any time a tool call returns a connection error. A server that was
+up at session start can drop mid-session — reconnect and retry before concluding the data
+is unreachable.

@@ -1,0 +1,55 @@
+# Rule: Environment Safety
+
+## Mutation policy
+
+- **Dev and staging are both valid mutation targets.**
+- **Production is never a valid target for any automated action** — absolute.
+- Mutation always happens **through the application** — UI, the app's API, or message queues
+  — never as a direct write to any database. DB access stays read-only regardless.
+
+A mutating scenario run against staging must:
+
+1. Use test data from the reusable registry (`.claude/rules/reusable-test-data.md`) when
+   an entry exists for the domain — creating new data is the fallback, not the default.
+2. Pair the mutation with a teardown that restores the pre-test state.
+3. Capture the live baseline before mutating — never assume a registry description reflects
+   the current state.
+
+## Environment guard before any mutating action
+
+Gate only against production:
+
+```python
+def mutation_environment_must_be_safe(env: str) -> None:
+    if env == "production":
+        raise RuntimeError("Mutating tests must never target production.")
+```
+
+or in Robot Framework:
+
+```robotframework
+Mutation Environment Must Be Safe
+    IF    '${ENV}' == 'production'
+        Fail    Mutating tests must never target production.
+    END
+```
+
+## DB access
+
+- Use read-only credentials for all DB queries.
+- Tools:
+{% if has_sql %}
+  - SQL: {{ sql_dbs | join(', ') | title }} — via MCP connector or read-only client
+{% endif %}
+{% if has_nosql %}
+  - NoSQL: {{ nosql_dbs | join(', ') | title }} — via query script, never a raw shell
+{% endif %}
+- Never attempt writes or schema changes through the test tooling.
+
+## Manual triage stays in the loop
+
+Automated verification augments QA judgment — it does not replace it. A QA engineer must:
+
+- Review the evidence before approving any ticket transition
+- Approve ticket comments before they are posted
+- Validate any automated finding against their domain knowledge

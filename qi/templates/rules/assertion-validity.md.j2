@@ -1,0 +1,80 @@
+# Rule: Assertion Validity
+
+An assertion that cannot fail proves nothing. Before trusting a green result, prove the
+check is capable of going red.
+
+## 1. Never assert an expected value that equals the current value
+
+If the value you expect after a mutation is already what the record holds, the assertion
+passes whether or not the code under test ran.
+
+```
+# Vacuous — baseline is already the expected result
+baseline:  tag_a|tag_b
+sent:      tag_a|tag_b|tag_a
+expected:  tag_a|tag_b     ← passes even with the fix reverted
+
+# Valid — the row must change for the assertion to hold
+baseline:  tag_a|tag_b
+sent:      tag_c|tag_d
+expected:  tag_c|tag_d
+```
+
+Pick fixtures and payloads so that **expected ≠ baseline**. Where it adds signal, assert
+the negative too: that the stored value is *not* the raw input.
+
+## 2. Absence assertions need a negative control
+
+A query that returns zero rows may be correct, or may be querying the wrong table, column,
+or a typo'd name. Before accepting "no rows means clean", prove the same query returns rows
+*somewhere* — another environment, another record, a pre-mutation snapshot.
+
+**A search that returns nothing is an absence assertion too**, and free-text search is the
+worst place to make one. Never conclude "X does not exist" from a query over human-written
+text — titles, commit messages, page names, issue summaries. Find the authoritative record
+instead.
+
+**Corollary — do not infer a shared system's state from a local mirror.** A cached number,
+a coverage file, or a local summary does not say which individual items are counted.
+Read the authoritative source before reporting a delta.
+
+## 3. Verify the premise before you write it into a ticket
+
+Statements handed to you — "the script already ran", "that record doesn't exist", "it's
+deployed" — are inputs to verify, not facts to relay. Check them against the database or
+the deploy record before they enter a ticket comment, because that is the first thing a
+reader will re-run.
+
+Applies equally to your own earlier conclusions. If a later observation contradicts
+something you already reported, say so explicitly and correct it rather than letting both
+statements stand.
+
+## 4. Test the explanation — don't just adopt it
+
+When someone offers a cause, design the check that could refute it. A hypothesis that
+survives an attempt to break it is worth reporting; one that was merely plausible is not.
+
+Prefer an A/B on a single differing attribute over a sequence of one-off observations.
+
+## 5. A silent no-op is not a pass
+
+Some integrations accept malformed input, return success, and do nothing. Before reading
+"no change" as evidence about the code under test, confirm the request was actually
+processed.
+
+When a check has an "or skip" variant, remember a skip is not a pass — audit periodically
+that skips are environmental, not a broken payload or a wrong identifier.
+
+**A helper keyword can manufacture the same false pass.** If a success check keys on
+something that both success and failure produce (e.g. a button state), the check is
+worthless. Key success on something only success produces.
+
+## 6. One mutation, one observation window
+
+Asynchronous verification reads a value some time after triggering a change. That reading
+is only evidence if nothing *else* could have written the value in between.
+
+- Fire one mutation, poll until you see its result, confirm the pipeline has drained,
+  only then fire the next.
+- If a result you already observed later disagrees with the current value, do not report
+  either reading until you can explain the sequence. Re-run the case in isolation.

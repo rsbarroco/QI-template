@@ -1,0 +1,49 @@
+# Rule: Coverage Numbers Must Never Drift
+
+Three places record what is tested, and they disagree the moment one is updated alone:
+
+| Source | What it holds |
+|---|---|
+| `COVERAGE.md` + `specs/<domain>.md` | the repo's own feature rows |
+| {{ doc_label }} coverage page | the shared automation %, one row per team/area |
+
+## The rule
+
+After **every** task that creates a test case or automates an existing one, update all
+sources in the same session. A task is not done until they agree.
+
+Never edit numbers by hand — recompute:
+
+```bash
+python scripts/coverage_report.py
+```
+
+## Arithmetic that must hold
+
+The coverage page states per-area fractions **and** a total. They must be consistent:
+
+- per-area numerators sum to the total numerator
+- per-area denominators sum to the total denominator
+- every percentage matches its own fraction
+
+Check the sums before publishing. A row whose parts contradict its total is worse than a
+stale row, because it looks maintained.
+
+## Publishing
+
+The coverage page is shared. Show the old → new value for each changed cell, get an
+explicit yes, then update with a note naming the ticket. Never touch another team's row.
+
+{% if doc_platform == 'confluence' %}
+The coverage page is one big table — edit it in **storage format**, never markdown, which
+flattens the table. See `.claude/rules/confluence-editing.md` for the safe editing
+procedure.
+{% endif %}
+
+## How to update
+
+1. `python scripts/coverage_report.py` — recomputes from `specs/<domain>.md` files
+2. Review the diff — confirm numerators, denominators, and percentages are consistent
+3. Show old → new to the QA engineer, get approval
+4. Publish to {{ doc_label }}
+5. Commit `COVERAGE.md` alongside the test change
