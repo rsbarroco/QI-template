@@ -1,0 +1,32 @@
+stages:
+  - test
+  - coverage
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+cache:
+  paths:
+    - .cache/pip/
+
+test:
+  stage: test
+  image: python:3.11
+  before_script:
+    - pip install -r requirements.txt
+{% if ui_web %}
+    - playwright install --with-deps chromium
+{% endif %}
+  script:
+    - python -m pytest tests/ -v
+    # or: robot --outputdir reports tests/
+  variables:
+    APP_USER: $APP_USER
+    APP_PASSWORD: $APP_PASSWORD
+
+coverage-gate:
+  stage: coverage
+  image: python:3.11
+  script:
+    - python scripts/coverage_report.py --check
+  allow_failure: false

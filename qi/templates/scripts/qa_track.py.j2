@@ -150,7 +150,7 @@ def cmd_report(args: argparse.Namespace) -> None:
         ])
 
     col_widths = [max(len(header[i]), max((len(row[i]) for row in rows), default=0)) for i in range(len(header))]
-    fmt = "  ".join(f"{{:<{w}}}" for w in col_widths)
+    fmt = "  ".join("{:<" + str(w) + "}" for w in col_widths)
     sep = "  ".join("-" * w for w in col_widths)
 
     print(f"\nSprint report — {args.sprint}\n")

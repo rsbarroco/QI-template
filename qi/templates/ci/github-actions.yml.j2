@@ -1,0 +1,50 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+{% if ui_web %}
+      - name: Install Playwright browsers
+        run: playwright install --with-deps chromium
+
+{% endif %}
+      - name: Run tests
+        env:
+          APP_USER: ${{ "{{" }} secrets.APP_USER {{ "}}" }}
+          APP_PASSWORD: ${{ "{{" }} secrets.APP_PASSWORD {{ "}}" }}
+{% if has_sql %}
+{% for db in sql_dbs %}
+          {{ db | upper }}_URL: ${{ "{{" }} secrets.{{ db | upper }}_URL {{ "}}" }}
+{% endfor %}
+{% endif %}
+{% if has_nosql %}
+{% for db in nosql_dbs %}
+          {{ db | upper }}_URI: ${{ "{{" }} secrets.{{ db | upper }}_URI {{ "}}" }}
+{% endfor %}
+{% endif %}
+        run: |
+          # Replace with your test runner command
+          python -m pytest tests/ -v
+          # or: robot --outputdir reports tests/
+          # or: npx playwright test
+
+      - name: Coverage gate
+        run: python scripts/coverage_report.py --check

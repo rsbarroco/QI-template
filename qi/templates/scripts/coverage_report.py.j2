@@ -78,10 +78,11 @@ def main() -> None:
     print(f"  Partial     : {totals['partial']}")
     print(f"  Manual only : {totals['manual']}\n")
 
-    print(f"  {'Domain':<30} {'Auto':>5} {'Partial':>8} {'Manual':>7}")
-    print(f"  {'-'*30} {'-'*5} {'-'*8} {'-'*7}")
+    hdr_line = "  " + "{:<30}  {:>5}  {:>8}  {:>7}".format("Domain", "Auto", "Partial", "Manual")
+    print(hdr_line)
+    print("  " + "-" * 30 + "  " + "-" * 5 + "  " + "-" * 8 + "  " + "-" * 7)
     for domain, auto, partial, manual in rows:
-        print(f"  {domain:<30} {auto:>5} {partial:>8} {manual:>7}")
+        print("  " + "{:<30}  {:>5}  {:>8}  {:>7}".format(domain, auto, partial, manual))
     print()
 
     # Update COVERAGE.md summary block
