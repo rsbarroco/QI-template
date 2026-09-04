@@ -1,8 +1,10 @@
 # Skill: mobile
 
 Use this skill when testing, verifying, or automating mobile interactions on
-{% if ui_mobile_ios and ui_mobile_android %}iOS and Android{% elif ui_mobile_ios %}iOS{% else %}Android{% endif %}.
+{% if ui_mobile_ios and ui_mobile_android %}iOS and Android{% elif ui_mobile_ios %}iOS{% else %}Android{% endif %}
+using **{{ ui_mobile_framework | replace("_", "+") | title }}**.
 
+{% if ui_mobile_framework == 'appium' %}
 ## Tool to use
 
 Use the Appium MCP connector (`appium_*` tools) — not a desktop browser automation tool.
@@ -20,35 +22,157 @@ Use the Appium MCP connector (`appium_*` tools) — not a desktop browser automa
 ## Locator hierarchy (most to least preferred)
 
 ```
-accessibility id        → most stable, maps to accessibilityIdentifier (iOS) / contentDescription (Android)
-id                      → resource-id (Android) / name (iOS)
-xpath                   → use only when nothing else works; prefer short paths
+accessibility id  → most stable (accessibilityIdentifier on iOS, contentDescription on Android)
+id                → resource-id (Android) / name (iOS)
+xpath             → last resort; prefer short paths anchored to a container
 ```
 
 ## Evidence rules
 
-- Screenshot every Given/When/Then step (use `appium_screenshot`)
-- Screenshots capture the full device screen — annotate which element is the focus if
-  the region is not obvious
-- Save screenshots under `evidence/<TICKET-KEY>/<scenario-slug>/`
+- Screenshot every Given/When/Then step (`appium_screenshot`)
+- Save under `evidence/<TICKET-KEY>/<scenario-slug>/`
 
 {% if ui_mobile_ios %}
-## iOS-specific notes
+## iOS notes
 
-- Test on the iOS Simulator (Xcode) before real device
-- Use `prepare_ios_simulator` before the first session if the simulator is cold
-- Accessibility IDs are the most reliable locator — ask devs to add them if missing
-- Gestures: use `appium_gesture` (tap, swipe, scroll); `appium_perform_actions` for
-  complex multi-touch
+- Boot the iOS Simulator (Xcode) and call `prepare_ios_simulator` before the first session
+- Accessibility IDs are the most reliable locator — request devs to add them if missing
+- Use `appium_gesture` (tap, swipe, scroll) and `appium_perform_actions` for multi-touch
 
 {% endif %}
 {% if ui_mobile_android %}
-## Android-specific notes
+## Android notes
 
-- Test on the Android Emulator (AVD) before real device
-- `contentDescription` is the closest equivalent to iOS `accessibilityIdentifier`
-- Use `appium_mobile_keyboard` for text input on Android (avoid direct `send_keys` for
-  special characters)
+- Start the Android Emulator (AVD Manager) before creating a session
+- `contentDescription` maps to `accessibility id` — prefer it over `resource-id`
+- Use `appium_mobile_keyboard` for special-character input
+
+{% endif %}
+{% elif ui_mobile_framework == 'detox' %}
+## Detox (React Native)
+
+Detox runs tests in the same process as the React Native JS bundle, enabling reliable
+grey-box testing without external network calls to Appium.
+
+### Prerequisites
+
+```bash
+npm install --save-dev detox
+npx detox init        # creates .detoxrc.js and e2e/ scaffold
+```
+
+### Writing a test
+
+```javascript
+// e2e/login.test.js
+describe("Login flow", () => {
+  beforeEach(async () => {
+    await device.reloadReactNative();
+  });
+
+  it("should log in with valid credentials", async () => {
+    await element(by.id("username-input")).typeText("user@example.com");
+    await element(by.id("password-input")).typeText("secret");
+    await element(by.id("login-button")).tap();
+    await expect(element(by.id("home-screen"))).toBeVisible();
+  });
+});
+```
+
+### Locator priority
+
+```
+by.id("testID")          → set testID prop in your React Native component
+by.label("Accessible label")
+by.text("Visible text")  → fragile to i18n; avoid for anything localised
+```
+
+### Run
+
+```bash
+# Build (once)
+npx detox build --configuration ios.sim.release
+
+# Run all e2e tests
+npx detox test --configuration ios.sim.release
+```
+
+### Evidence
+
+Detox artifacts (screenshots, video) are configured in `.detoxrc.js`:
+
+```js
+artifacts: {
+  rootDir: "evidence/",
+  plugins: { screenshot: "failing", video: "none" },
+},
+```
+
+{% elif ui_mobile_framework == 'espresso_xcuitest' %}
+## Native frameworks: Espresso (Android) + XCUITest (iOS)
+
+These run entirely inside the platform's own test runner — no Appium server needed.
+Use them when the app is fully native (not React Native / Flutter) and maximum speed matters.
+
+{% if ui_mobile_android %}
+### Espresso (Android — Kotlin/Java)
+
+```kotlin
+// ExampleInstrumentedTest.kt
+@RunWith(AndroidJUnit4::class)
+class LoginTest {
+
+    @get:Rule
+    val activityRule = ActivityScenarioRule(LoginActivity::class.java)
+
+    @Test
+    fun validCredentials_navigatesToHome() {
+        onView(withId(R.id.username)).perform(typeText("user@example.com"), closeSoftKeyboard())
+        onView(withId(R.id.password)).perform(typeText("secret"), closeSoftKeyboard())
+        onView(withId(R.id.loginButton)).perform(click())
+        onView(withId(R.id.homeScreen)).check(matches(isDisplayed()))
+    }
+}
+```
+
+Run: `./gradlew connectedAndroidTest` (requires a connected device or running emulator)
+
+{% endif %}
+{% if ui_mobile_ios %}
+### XCUITest (iOS — Swift)
+
+```swift
+// LoginUITests.swift
+final class LoginTests: XCTestCase {
+    let app = XCUIApplication()
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        app.launch()
+    }
+
+    func testValidLogin() throws {
+        app.textFields["username-field"].tap()
+        app.textFields["username-field"].typeText("user@example.com")
+        app.secureTextFields["password-field"].typeText("secret")
+        app.buttons["login-button"].tap()
+        XCTAssertTrue(app.otherElements["home-screen"].waitForExistence(timeout: 5))
+    }
+}
+```
+
+Run: `xcodebuild test -scheme MyApp -destination 'platform=iOS Simulator,name=iPhone 15'`
+
+**Accessibility identifiers** are the most stable locator — set `.accessibilityIdentifier` in
+UIKit or `accessibilityIdentifier()` / `.accessibilityLabel()` in SwiftUI.
+
+{% endif %}
+### Evidence
+
+Both frameworks attach screenshots automatically on failure. For always-on screenshots:
+
+- **Espresso**: use `ScreenshotRule` (from `androidx.test.runner.screenshot`) in the test rule.
+- **XCUITest**: call `XCTAttachment(screenshot: XCUIScreen.main.screenshot())` inside the test.
 
 {% endif %}
 
@@ -56,7 +180,8 @@ xpath                   → use only when nothing else works; prefer short paths
 
 | Symptom | Likely cause |
 |---|---|
-| Element not found | App not fully loaded — add an explicit wait |
-| Intermittent tap failure | Element partially obscured by keyboard — scroll it into view |
-| Session fails to create | Simulator/emulator not booted — call `prepare_ios_simulator` or start AVD |
-| Wrong screen after action | Navigation animation still in progress — wait for the target screen's marker element |
+| Element not found | App not fully loaded — add an explicit wait / `waitForExistence` |
+| Intermittent tap failure | Element partially obscured by keyboard — dismiss keyboard first |
+| Simulator fails to boot | Incompatible Xcode/simulator version — run `xcrun simctl list` to verify |
+| Detox build passes but test fails | React Native bundler not started — run `npx react-native start` before tests |
+| Espresso `AmbiguousViewMatcherException` | Multiple views match the selector — scope with `inRoot` or add `withParent` |

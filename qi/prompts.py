@@ -74,15 +74,38 @@ def ask() -> Config:
     cfg.ui_mobile_ios = "Mobile — iOS" in ui_choices
     cfg.ui_mobile_android = "Mobile — Android" in ui_choices
 
+    if cfg.has_mobile:
+        cfg.ui_mobile_framework = questionary.select(
+            "Mobile test framework?",
+            choices=[
+                questionary.Choice("Appium (cross-platform)", "appium"),
+                questionary.Choice("Detox (React Native)", "detox"),
+                questionary.Choice("Espresso / XCUITest (native)", "espresso_xcuitest"),
+            ],
+        ).ask()
+
     cfg.test_framework = questionary.select(
         "Primary test framework?",
         choices=[
             questionary.Choice("Robot Framework", "robot"),
             questionary.Choice("Playwright (Python/JS)", "playwright"),
+            questionary.Choice("WebdriverIO", "webdriverio"),
             questionary.Choice("Cypress", "cypress"),
             questionary.Choice("Jest / Vitest", "jest"),
             questionary.Choice("Custom / other", "custom"),
             questionary.Choice("None / TBD", "none"),
+        ],
+    ).ask()
+
+    cfg.performance = questionary.select(
+        "Performance / load testing?",
+        choices=[
+            questionary.Choice("k6", "k6"),
+            questionary.Choice("Locust (Python)", "locust"),
+            questionary.Choice("JMeter", "jmeter"),
+            questionary.Choice("Gatling", "gatling"),
+            questionary.Choice("Artillery", "artillery"),
+            questionary.Choice("None", "none"),
         ],
     ).ask()
 

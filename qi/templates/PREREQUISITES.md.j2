@@ -1,0 +1,295 @@
+# Prerequisites
+
+Install all items marked ✅ before running tests or QA scripts in this project.
+
+---
+
+## Always required
+
+### Python 3.8+
+
+Required for the QA utility scripts (`scripts/qa_track.py`, `scripts/coverage_report.py`).
+These scripts are standalone — they do not depend on the test framework you chose.
+
+| OS | Install |
+|---|---|
+| macOS | `brew install python3` or download from python.org |
+| Windows | Download installer from https://python.org/downloads — **check "Add Python to PATH"** |
+| Linux | `sudo apt install python3 python3-pip` (Debian/Ubuntu) |
+
+Verify: `python3 --version` should print `3.8` or higher.
+
+---
+{% if test_framework in ['playwright', 'cypress', 'webdriverio', 'jest', 'detox'] or performance == 'artillery' or ui_mobile_framework == 'detox' %}
+
+## Node.js 18+
+
+Required for
+{% set node_reasons = [] %}
+{% if test_framework == 'playwright' %}{% set _ = node_reasons.append('Playwright') %}{% endif %}
+{% if test_framework == 'cypress' %}{% set _ = node_reasons.append('Cypress') %}{% endif %}
+{% if test_framework == 'webdriverio' %}{% set _ = node_reasons.append('WebdriverIO') %}{% endif %}
+{% if test_framework == 'jest' %}{% set _ = node_reasons.append('Jest/Vitest') %}{% endif %}
+{% if performance == 'artillery' %}{% set _ = node_reasons.append('Artillery') %}{% endif %}
+{% if ui_mobile_framework == 'detox' %}{% set _ = node_reasons.append('Detox') %}{% endif %}
+{{ node_reasons | join(', ') }}.
+
+| OS | Install |
+|---|---|
+| macOS / Linux | `brew install node` or use [nvm](https://github.com/nvm-sh/nvm): `nvm install 18` |
+| Windows | Download installer from https://nodejs.org (LTS) — includes npm |
+
+Verify: `node --version` → `v18.x` or higher.
+
+{% endif %}
+{% if test_framework == 'robot' %}
+
+## Robot Framework
+
+```bash
+pip3 install robotframework robotframework-browser
+rfbrowser init
+```
+
+{% elif test_framework == 'playwright' %}
+
+## Playwright
+
+```bash
+npm install -D @playwright/test
+npx playwright install
+```
+
+{% elif test_framework == 'cypress' %}
+
+## Cypress
+
+```bash
+npm install -D cypress
+```
+
+{% elif test_framework == 'webdriverio' %}
+
+## WebdriverIO
+
+```bash
+npm init wdio@latest .
+```
+
+The setup wizard installs the required browser drivers.
+
+{% elif test_framework == 'jest' %}
+
+## Jest / Vitest
+
+```bash
+npm install -D jest
+# or: npm install -D vitest
+```
+
+{% endif %}
+{% if performance in ['jmeter', 'gatling'] %}
+
+## Java 11+
+
+Required for {{ performance | title }}.
+
+| OS | Install |
+|---|---|
+| macOS | `brew install openjdk@17` |
+| Windows | Download from https://adoptium.net |
+| Linux | `sudo apt install openjdk-17-jdk` |
+
+Verify: `java -version`
+
+{% endif %}
+{% if performance == 'k6' %}
+
+## k6
+
+| OS | Install |
+|---|---|
+| macOS | `brew install k6` |
+| Windows | `winget install k6` or download from https://k6.io/docs/getting-started/installation |
+| Linux | See https://k6.io/docs/getting-started/installation/#linux |
+
+Verify: `k6 version`
+
+{% elif performance == 'locust' %}
+
+## Locust
+
+```bash
+pip3 install locust
+```
+
+Verify: `locust --version`
+
+{% elif performance == 'jmeter' %}
+
+## JMeter
+
+Download from https://jmeter.apache.org/download_jmeter.cgi and add the `bin/` directory to
+your PATH.
+
+Verify: `jmeter --version`
+
+{% elif performance == 'gatling' %}
+
+## Gatling
+
+Download from https://gatling.io/open-source/ (or use the Maven/Gradle plugin — no separate
+install needed if you already have Maven/Gradle in the project).
+
+{% elif performance == 'artillery' %}
+
+## Artillery
+
+```bash
+npm install -g artillery
+```
+
+Verify: `artillery version`
+
+{% endif %}
+{% if ui_mobile_framework == 'appium' %}
+
+## Appium
+
+```bash
+npm install -g appium
+```
+
+Then install the driver(s) for your platform:
+
+```bash
+appium driver install uiautomator2   # Android
+appium driver install xcuitest       # iOS
+```
+
+{% if ui_mobile_ios %}
+**iOS** also requires Xcode (from the Mac App Store) and the Xcode Command Line Tools:
+```bash
+xcode-select --install
+```
+{% endif %}
+{% if ui_mobile_android %}
+**Android** also requires Android Studio (to manage AVDs and SDK):
+https://developer.android.com/studio
+{% endif %}
+
+Verify: `appium --version`
+
+{% elif ui_mobile_framework == 'detox' %}
+
+## Detox
+
+```bash
+npm install -g detox-cli
+```
+
+{% if ui_mobile_ios %}
+iOS also requires Xcode (from the Mac App Store):
+```bash
+xcode-select --install
+```
+{% endif %}
+{% if ui_mobile_android %}
+Android also requires Android Studio and an AVD:
+https://developer.android.com/studio
+{% endif %}
+
+{% elif ui_mobile_framework == 'espresso_xcuitest' %}
+{% if ui_mobile_ios %}
+
+## Xcode (for XCUITest — iOS only)
+
+Install from the Mac App Store. After install:
+```bash
+xcode-select --install
+sudo xcodebuild -license accept
+```
+
+{% endif %}
+{% if ui_mobile_android %}
+
+## Android Studio (for Espresso — Android only)
+
+Download from https://developer.android.com/studio. Use the AVD Manager to create an
+emulator before running tests.
+
+Verify: `adb version`
+
+{% endif %}
+{% endif %}
+{% if has_sql %}
+
+## Database clients
+
+{% for db in sql_dbs %}
+{% if db == 'postgresql' %}
+- **PostgreSQL client**: `brew install libpq` (macOS) / `sudo apt install postgresql-client` (Linux) / included in PostgreSQL installer on Windows
+{% elif db == 'mysql' %}
+- **MySQL client**: `brew install mysql-client` / `sudo apt install mysql-client`
+{% elif db == 'mssql' %}
+- **SQL Server ODBC driver**: see https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server
+{% endif %}
+{% endfor %}
+
+{% endif %}
+{% if has_cloud %}
+
+## Cloud CLI
+
+{% if cloud == 'aws' %}
+```bash
+# AWS CLI
+pip3 install awscli
+aws configure
+```
+{% elif cloud == 'gcp' %}
+```bash
+# gcloud CLI
+brew install google-cloud-sdk   # macOS
+# or: https://cloud.google.com/sdk/docs/install
+gcloud auth login
+gcloud config set project YOUR_PROJECT
+```
+{% elif cloud == 'azure' %}
+```bash
+# Azure CLI
+brew install azure-cli          # macOS
+# or: https://learn.microsoft.com/en-us/cli/azure/install-azure-cli
+az login
+```
+{% endif %}
+
+{% endif %}
+
+---
+
+## Quick verification checklist
+
+```bash
+python3 --version        # 3.8+
+{% if test_framework in ['playwright', 'cypress', 'webdriverio', 'jest'] or performance == 'artillery' or ui_mobile_framework in ['appium', 'detox'] %}
+node --version           # 18+
+{% endif %}
+{% if performance in ['jmeter', 'gatling'] %}
+java -version            # 11+
+{% endif %}
+{% if performance == 'k6' %}
+k6 version
+{% elif performance == 'locust' %}
+locust --version
+{% elif performance == 'artillery' %}
+artillery version
+{% endif %}
+{% if ui_mobile_framework == 'appium' %}
+appium --version
+{% elif ui_mobile_framework == 'detox' %}
+detox --version
+{% endif %}
+```
+
+If any command fails, follow the install steps above for that tool.

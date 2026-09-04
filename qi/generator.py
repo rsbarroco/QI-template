@@ -37,6 +37,7 @@ def _always() -> list[tuple[str, str]]:
         ("scripts/coverage_report.py.j2",         "scripts/coverage_report.py"),
         ("scripts/README-qa-activity.md.j2",      "scripts/README-qa-activity.md"),
         ("specs/README.md.j2",                    "specs/README.md"),
+        ("PREREQUISITES.md.j2",                   "PREREQUISITES.md"),
     ]
 
 
@@ -56,6 +57,8 @@ def _conditional(cfg: Config) -> list[tuple[str, str]]:
         pairs.append(("skills/cloud-logs.md.j2", ".claude/skills/cloud-logs.md"))
     if cfg.has_queues:
         pairs.append(("skills/queue-testing.md.j2", ".claude/skills/queue-testing.md"))
+    if cfg.has_performance:
+        pairs.append(("skills/performance.md.j2", ".claude/skills/performance.md"))
     if cfg.ci == "github_actions":
         pairs.append(("ci/github-actions.yml.j2", ".github/workflows/tests.yml"))
     elif cfg.ci == "gitlab_ci":
@@ -128,4 +131,8 @@ def _build_context(cfg: Config) -> dict:
         "has_ui": cfg.has_ui,
         "has_queues": cfg.has_queues,
         "has_cloud": cfg.has_cloud,
+        "performance": cfg.performance,
+        "has_performance": cfg.has_performance,
+        "ui_mobile_framework": cfg.ui_mobile_framework,
+        "has_mobile": cfg.has_mobile,
     }

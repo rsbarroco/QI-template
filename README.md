@@ -32,13 +32,20 @@ each question has a fixed list of options to choose from.
 | **SQL databases** | PostgreSQL / MySQL / SQLite / MS SQL Server *(multi-select)* |
 | **NoSQL databases** | MongoDB / Redis / DynamoDB / Firestore *(multi-select)* |
 | **UI surfaces** | Web (browser) / Mobile — iOS / Mobile — Android *(multi-select)* |
-| **Test framework** | Robot Framework / Playwright / Cypress / Jest / Custom / None |
+| **Mobile framework** *(if mobile selected)* | Appium (cross-platform) / Detox (React Native) / Espresso + XCUITest (native) |
+| **Test framework** | Robot Framework / Playwright / WebdriverIO / Cypress / Jest-Vitest / Custom / None |
+| **Performance testing** | k6 / Locust / JMeter / Gatling / Artillery / None |
 | **Cloud provider** | AWS / GCP / Azure / None |
 | **Async queues** | SQS / Pub-Sub / Kafka / RabbitMQ *(multi-select)* |
 | **CI/CD** | GitHub Actions / GitLab CI / Jenkins / None |
 
 Selecting "None" for any question skips the related files — only what's relevant to your
 stack gets generated.
+
+> **About Python:** `scripts/qa_track.py` and `scripts/coverage_report.py` are standalone
+> Python 3 utilities. They are independent of the test framework you choose — even if your
+> tests run in TypeScript or another language, these scripts still need Python 3. The
+> generated `PREREQUISITES.md` lists every system dependency for your specific stack.
 
 ### Options
 
@@ -74,6 +81,7 @@ qi [OUTPUT_DIR] [--dry-run]
 | `scripts/qa_track.py` | AI-usage activity tracker |
 | `scripts/coverage_report.py` | Recomputes COVERAGE.md from specs |
 | `specs/README.md` | How to write domain specs |
+| `PREREQUISITES.md` | System dependencies for your stack (Python, Node.js, Java…) |
 
 ### Generated conditionally (based on your answers)
 
@@ -82,9 +90,10 @@ qi [OUTPUT_DIR] [--dry-run]
 | Any SQL database selected | `.claude/skills/sql-query.md` |
 | Any NoSQL database selected | `.claude/skills/nosql-query.md` |
 | Web UI selected | `.claude/skills/web-ui.md` |
-| iOS or Android selected | `.claude/skills/mobile.md` |
+| iOS or Android selected | `.claude/skills/mobile.md` (tailored to Appium / Detox / native) |
 | AWS / GCP / Azure selected | `.claude/skills/cloud-logs.md` |
 | Any queue selected | `.claude/skills/queue-testing.md` |
+| Performance tool selected | `.claude/skills/performance.md` (k6 / Locust / JMeter / Gatling / Artillery) |
 | GitHub Actions selected | `.github/workflows/tests.yml` |
 | GitLab CI selected | `.gitlab-ci.yml` |
 

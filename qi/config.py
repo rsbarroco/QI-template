@@ -19,9 +19,13 @@ class Config:
     ui_web: bool = False
     ui_mobile_ios: bool = False
     ui_mobile_android: bool = False
+    ui_mobile_framework: str = "appium"  # appium | detox | espresso_xcuitest
 
     # Test framework (advisory — the template is agnostic, but README uses it)
-    test_framework: str = "none"     # robot | playwright | cypress | jest | custom
+    test_framework: str = "none"     # robot | playwright | cypress | jest | webdriverio | custom | none
+
+    # Performance testing
+    performance: str = "none"        # k6 | locust | jmeter | gatling | artillery | none
 
     # Infrastructure
     cloud: str = "none"              # aws | gcp | azure | none
@@ -42,9 +46,17 @@ class Config:
         return self.ui_web or self.ui_mobile_ios or self.ui_mobile_android
 
     @property
+    def has_mobile(self) -> bool:
+        return self.ui_mobile_ios or self.ui_mobile_android
+
+    @property
     def has_queues(self) -> bool:
         return bool(self.queues)
 
     @property
     def has_cloud(self) -> bool:
         return self.cloud != "none"
+
+    @property
+    def has_performance(self) -> bool:
+        return self.performance != "none"

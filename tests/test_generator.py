@@ -86,6 +86,7 @@ ALWAYS_FILES = {
     "CLAUDE.md",
     "README.md",
     "COVERAGE.md",
+    "PREREQUISITES.md",
     ".claude/rules/assertion-validity.md",
     ".claude/rules/evidence-based-qa.md",
     ".claude/rules/environment-safety.md",
@@ -248,3 +249,135 @@ def test_coverage_report_script_is_valid_python(tmp_path: Path):
     script = tmp_path / "scripts/coverage_report.py"
     assert script.exists()
     compile(script.read_text(), str(script), "exec")
+
+
+# ---------------------------------------------------------------------------
+# Performance skill tests
+# ---------------------------------------------------------------------------
+
+def _k6_cfg() -> Config:
+    return Config(
+        project_name="Perf Project",
+        project_slug="perf-project",
+        performance="k6",
+    )
+
+
+def _locust_cfg() -> Config:
+    return Config(
+        project_name="Perf Project",
+        project_slug="perf-project",
+        performance="locust",
+    )
+
+
+def test_performance_skill_generated_when_selected(tmp_path: Path):
+    generate(_k6_cfg(), tmp_path)
+    skill = tmp_path / ".claude/skills/performance.md"
+    assert skill.exists()
+
+
+def test_performance_skill_not_generated_when_none(tmp_path: Path):
+    generate(_minimal_cfg(), tmp_path)
+    assert not (tmp_path / ".claude/skills/performance.md").exists()
+
+
+def test_performance_skill_k6_contains_k6_content(tmp_path: Path):
+    generate(_k6_cfg(), tmp_path)
+    content = (tmp_path / ".claude/skills/performance.md").read_text()
+    assert "k6" in content
+    assert "http_req_duration" in content
+
+
+def test_performance_skill_locust_contains_locust_content(tmp_path: Path):
+    generate(_locust_cfg(), tmp_path)
+    content = (tmp_path / ".claude/skills/performance.md").read_text()
+    assert "locust" in content.lower()
+    assert "HttpUser" in content
+
+
+# ---------------------------------------------------------------------------
+# Mobile framework variant tests
+# ---------------------------------------------------------------------------
+
+def _detox_cfg() -> Config:
+    return Config(
+        project_name="Mobile Project",
+        project_slug="mobile-project",
+        ui_mobile_ios=True,
+        ui_mobile_framework="detox",
+    )
+
+
+def _espresso_cfg() -> Config:
+    return Config(
+        project_name="Native Mobile",
+        project_slug="native-mobile",
+        ui_mobile_android=True,
+        ui_mobile_framework="espresso_xcuitest",
+    )
+
+
+def test_mobile_skill_detox_mentions_react_native(tmp_path: Path):
+    generate(_detox_cfg(), tmp_path)
+    content = (tmp_path / ".claude/skills/mobile.md").read_text()
+    assert "Detox" in content
+    assert "React Native" in content
+
+
+def test_mobile_skill_detox_has_setup_commands(tmp_path: Path):
+    generate(_detox_cfg(), tmp_path)
+    content = (tmp_path / ".claude/skills/mobile.md").read_text()
+    assert "detox-cli" in content or "npx detox" in content
+
+
+def test_mobile_skill_espresso_mentions_espresso(tmp_path: Path):
+    generate(_espresso_cfg(), tmp_path)
+    content = (tmp_path / ".claude/skills/mobile.md").read_text()
+    assert "Espresso" in content
+
+
+def test_mobile_skill_appium_default(tmp_path: Path):
+    generate(_mobile_cfg(), tmp_path)
+    content = (tmp_path / ".claude/skills/mobile.md").read_text()
+    assert "Appium" in content
+
+
+# ---------------------------------------------------------------------------
+# PREREQUISITES.md tests
+# ---------------------------------------------------------------------------
+
+def test_prerequisites_generated_for_minimal(tmp_path: Path):
+    generate(_minimal_cfg(), tmp_path)
+    prereq = tmp_path / "PREREQUISITES.md"
+    assert prereq.exists()
+    content = prereq.read_text()
+    assert "Python 3" in content
+
+
+def test_prerequisites_mentions_node_for_playwright(tmp_path: Path):
+    cfg = Config(
+        project_name="Playwright Project",
+        project_slug="playwright-project",
+        test_framework="playwright",
+    )
+    generate(cfg, tmp_path)
+    content = (tmp_path / "PREREQUISITES.md").read_text()
+    assert "Node.js" in content
+
+
+def test_prerequisites_mentions_java_for_jmeter(tmp_path: Path):
+    cfg = Config(
+        project_name="Perf Project",
+        project_slug="perf-project",
+        performance="jmeter",
+    )
+    generate(cfg, tmp_path)
+    content = (tmp_path / "PREREQUISITES.md").read_text()
+    assert "Java" in content
+
+
+def test_prerequisites_no_node_for_minimal(tmp_path: Path):
+    generate(_minimal_cfg(), tmp_path)
+    content = (tmp_path / "PREREQUISITES.md").read_text()
+    assert "Node.js" not in content
