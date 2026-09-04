@@ -27,6 +27,7 @@ def _always() -> list[tuple[str, str]]:
         ("rules/connection-validation.md.j2",     ".claude/rules/connection-validation.md"),
         ("rules/coverage-sync.md.j2",             ".claude/rules/coverage-sync.md"),
         ("rules/feedback-loop.md.j2",             ".claude/rules/feedback-loop.md"),
+        ("rules/reusable-test-data.md.j2",        ".claude/rules/reusable-test-data.md"),
         ("skills/ticket-intake.md.j2",            ".claude/skills/ticket-intake.md"),
         ("skills/verify-ticket.md.j2",            ".claude/skills/verify-ticket.md"),
         ("skills/gap-analysis.md.j2",             ".claude/skills/gap-analysis.md"),

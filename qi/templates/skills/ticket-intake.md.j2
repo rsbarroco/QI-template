@@ -39,9 +39,10 @@ python scripts/qa_track.py start \
 
 Before writing any new case, check what already exists:
 
-1. Search `specs/<domain>.md` for the ticket's feature area — list every row
-2. Search `tests/` for existing test cases covering the ACs
-3. Check the coverage page in {{ doc_label }}
+1. Fetch the ticket from **{{ tracker_label }}**{% if tracker_project_key %} (project: `{{ tracker_project_key }}`){% endif %} — read the full AC / validation steps
+2. Search `specs/<domain>.md` for the ticket's feature area — list every row
+3. Search `tests/` for existing test cases covering the ACs
+4. Check the coverage page in {{ doc_label }}
 
 Classify each AC:
 - ✅ Covered — a test exists and the AC text still matches its `[Documentation]`

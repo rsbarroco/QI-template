@@ -1,0 +1,53 @@
+# Rule: Reusable E2E Test Data
+
+Stop paying full setup cost for a fresh record every time a scenario needs a real,
+testable item. Catalog known-good records once, reuse them across tickets, and restore
+them with a teardown instead of recreating them.
+
+## Where the registry lives
+
+`resources/test_data/e2e_reusable_<domain>_<env>.yaml`, one file per domain per
+environment.
+
+Each entry:
+
+```yaml
+ITEM_E2E_01:
+  id: "some-id"
+  domain: products
+  classification: mutation-target   # or: read-fixture
+  description: "Used for publish-flow E2E; mutated fields are restored on teardown"
+  teardown_keyword: "Restore Item Baseline"
+  owning_ticket: TICKET-XXX
+  added: 2026-01-01
+```
+
+## Classification
+
+- **read-fixture** — the test only reads or navigates to the record, never mutates it.
+  Freely reusable, no teardown needed.
+- **mutation-target** — the test edits, publishes, or deletes fields on the record.
+  Requires a teardown every time:
+  1. At test start, capture the record's **live** current values (not the registry description)
+  2. Mutate, assert
+  3. In teardown, restore the captured baseline via the established keyword
+
+## Teardown must be code, not ad hoc exploration
+
+Implement one teardown keyword per domain — built like any other test keyword, not an
+interactive session re-derived on every run. Call it from teardown on every mutating
+scenario, including on test failure.
+
+## Adding an entry
+
+A new registry entry is shared fixture data. Before committing:
+
+1. Confirm the record is stable enough to be a long-lived fixture
+2. Write and prove the teardown keyword (mutate → assert → teardown → assert restored)
+3. Get the QA engineer's sign-off
+4. Commit the YAML entry alongside the test that introduced it
+
+## What this does not change
+
+- DB access stays read-only — mutation is always through the application
+- Production is never a target
