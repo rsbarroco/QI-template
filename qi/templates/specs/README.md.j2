@@ -1,0 +1,40 @@
+# Specs — {{ project_name }}
+
+One markdown file per domain. Each file is the source of truth for what must be tested
+in that domain.
+
+## How to create a new spec
+
+1. Create `specs/<domain>.md`
+2. Add the header (copy the template below)
+3. Add one row per feature — status ❌ initially
+4. Update status to ✅ when the test is written and passing
+5. Add a row to `COVERAGE.md` for the new domain
+6. Run `python scripts/coverage_report.py` to recompute totals
+
+## Template
+
+```markdown
+# <Domain> — Test Spec
+
+| Feature | Status | Test file | Notes |
+|---|---|---|---|
+| Feature A | ❌ | — | AC from TICKET-1 |
+| Feature B | ✅ | tests/domain/test_feature_b.py | Automated in TICKET-2 |
+| Feature C | ⚠️ | tests/domain/test_feature_c.py | Partial — missing edge case |
+```
+
+## Status values
+
+| Icon | Meaning |
+|---|---|
+| ✅ | Automated and passing |
+| ❌ | Manual only — not yet automated |
+| ⚠️ | Partial — test exists but coverage is incomplete |
+
+## Rules
+
+- Every row in a spec must be traceable to an acceptance criterion or ticket
+- Never add a ✅ before the test passes in CI
+- Never delete a ❌ row — it is deliberate coverage debt; mark it, don't hide it
+- Run `python scripts/coverage_report.py` after every status change — keep COVERAGE.md in sync

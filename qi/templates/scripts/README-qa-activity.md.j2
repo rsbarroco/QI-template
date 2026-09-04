@@ -1,0 +1,55 @@
+# QA Activity Tracker — {{ project_name }}
+
+`scripts/qa_track.py` records AI-assisted QA work per ticket, per sprint.
+
+## Quick reference
+
+```bash
+# Open a record at the start of each ticket
+python scripts/qa_track.py start \
+  --ticket TICKET-1 \
+  --title "My feature" \
+  --sprint 26-01 \
+  --basis ac \
+  --activity qa,automation
+
+# Close a record when the work is done
+python scripts/qa_track.py count \
+  --ticket TICKET-1 \
+  --manual 5 \
+  --automated 3 \
+  --reason "2 cases need live auth unavailable in CI"
+
+# Add a contextual note
+python scripts/qa_track.py note --ticket TICKET-1 "Staging lag observed — waited 60s"
+
+# Check which records are still missing counts
+python scripts/qa_track.py status
+
+# Generate the sprint report
+python scripts/qa_track.py report --sprint 26-01
+```
+
+## Column semantics
+
+| Column | Meaning |
+|---|---|
+| Ticket | The task key from {{ tracker_label }} |
+| Title | The task's summary |
+| QA | Resolved from `QA_NAME` env var or git `user.name` |
+| AI Used | Always `Yes - Claude` |
+| Basis | `ac` (only ACs read) / `plan` (only implementation read) / `both` |
+| Manual TCs | Test cases **created or updated** with AI help this sprint |
+| Automated TCs | Of those, how many became automated test cases |
+| Reason | Why the remainder was not automated (required when automated < manual) |
+
+## Honesty rules
+
+- Count only what actually exists. Planned-but-not-written cases are not automated.
+- Never invent a number to fill a cell. Leave it at 0 and say so.
+- The `--reason` field is required whenever `automated < manual`.
+
+## Where records are stored
+
+`~/.config/qi-activity/<TICKET-KEY>.json` — one JSON file per ticket, on the local machine.
+Records persist across sessions. The `report` command aggregates by sprint.

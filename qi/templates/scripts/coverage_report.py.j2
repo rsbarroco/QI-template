@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+"""
+coverage_report.py — recompute COVERAGE.md from specs/<domain>.md files.
+
+A spec file row format (one row per feature):
+
+  | Feature name | ✅ or ❌ | Notes |
+
+Any row whose second column is ✅ is counted as automated.
+Any row whose second column is ❌ is counted as manual-only.
+Rows with ⚠️ are counted as partial (manual, not automated).
+
+Usage
+-----
+  python scripts/coverage_report.py          # prints summary + updates COVERAGE.md
+  python scripts/coverage_report.py --check  # exits 1 if any ❌ rows exist
+"""
+
+from __future__ import annotations
+
+import argparse
+import re
+import sys
+from pathlib import Path
+
+SPECS_DIR = Path("specs")
+COVERAGE_FILE = Path("COVERAGE.md")
+
+STATUS_AUTOMATED = {"✅"}
+STATUS_PARTIAL = {"⚠️"}
+STATUS_MANUAL = {"❌"}
+
+
+def _parse_spec(path: Path) -> tuple[int, int, int]:
+    """Return (automated, partial, manual_only) counts from a spec file."""
+    auto = partial = manual = 0
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.startswith("|"):
+            continue
+        cols = [c.strip() for c in line.split("|") if c.strip()]
+        if len(cols) < 2:
+            continue
+        status = cols[1]
+        if status in STATUS_AUTOMATED:
+            auto += 1
+        elif status in STATUS_PARTIAL:
+            partial += 1
+        elif status in STATUS_MANUAL:
+            manual += 1
+    return auto, partial, manual
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--check", action="store_true", help="Exit 1 if coverage gaps exist")
+    args = parser.parse_args()
+
+    specs = sorted(SPECS_DIR.glob("*.md")) if SPECS_DIR.exists() else []
+
+    totals = {"auto": 0, "partial": 0, "manual": 0}
+    rows: list[tuple[str, int, int, int]] = []
+
+    for spec in specs:
+        domain = spec.stem
+        auto, partial, manual = _parse_spec(spec)
+        totals["auto"] += auto
+        totals["partial"] += partial
+        totals["manual"] += manual
+        rows.append((domain, auto, partial, manual))
+
+    total_cases = totals["auto"] + totals["partial"] + totals["manual"]
+    pct = round(totals["auto"] / total_cases * 100) if total_cases > 0 else 0
+
+    # Print summary
+    print(f"\nCoverage summary — {{ project_name }}")
+    print(f"  Total cases : {total_cases}")
+    print(f"  Automated   : {totals['auto']} ({pct}%)")
+    print(f"  Partial     : {totals['partial']}")
+    print(f"  Manual only : {totals['manual']}\n")
+
+    print(f"  {'Domain':<30} {'Auto':>5} {'Partial':>8} {'Manual':>7}")
+    print(f"  {'-'*30} {'-'*5} {'-'*8} {'-'*7}")
+    for domain, auto, partial, manual in rows:
+        print(f"  {domain:<30} {auto:>5} {partial:>8} {manual:>7}")
+    print()
+
+    # Update COVERAGE.md summary block
+    if COVERAGE_FILE.exists():
+        content = COVERAGE_FILE.read_text(encoding="utf-8")
+        new_table = (
+            f"| {total_cases} | {totals['auto']} | {pct}% |"
+        )
+        content = re.sub(
+            r"\| \d+ \| \d+ \| \d+% \|",
+            new_table,
+            content,
+            count=1,
+        )
+        COVERAGE_FILE.write_text(content, encoding="utf-8")
+        print(f"  COVERAGE.md updated: {total_cases} total / {totals['auto']} automated / {pct}%")
+
+    if args.check and totals["manual"] > 0:
+        print(f"\n[coverage_report] {totals['manual']} manual-only cases remain (❌). CI gate active.")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

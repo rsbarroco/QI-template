@@ -1,0 +1,207 @@
+#!/usr/bin/env python3
+"""
+qa_track.py — AI-assisted QA activity tracker for {{ project_name }}.
+
+Usage
+-----
+  python scripts/qa_track.py start   --ticket TICKET-1 --title "My feature" --sprint 26-01 --basis ac --activity qa
+  python scripts/qa_track.py count   --ticket TICKET-1 --manual 5 --automated 3 --reason "2 need live auth"
+  python scripts/qa_track.py note    --ticket TICKET-1 "Staging Mongo lag observed, waited 60s"
+  python scripts/qa_track.py status
+  python scripts/qa_track.py report  --sprint 26-01
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+TRACKER_DIR = Path.home() / ".config" / "qi-activity"
+TRACKER_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _record_path(ticket: str) -> Path:
+    return TRACKER_DIR / f"{ticket}.json"
+
+
+def _load(ticket: str) -> dict:
+    p = _record_path(ticket)
+    if p.exists():
+        return json.loads(p.read_text())
+    return {}
+
+
+def _save(ticket: str, data: dict) -> None:
+    _record_path(ticket).write_text(json.dumps(data, indent=2))
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _qa_name() -> str:
+    """Resolve QA name from env or git config."""
+    if name := os.environ.get("QA_NAME"):
+        return name
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["git", "config", "user.name"], capture_output=True, text=True
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return os.environ.get("USER", "unknown")
+
+
+# ---------------------------------------------------------------------------
+# Commands
+# ---------------------------------------------------------------------------
+
+def cmd_start(args: argparse.Namespace) -> None:
+    data = _load(args.ticket)
+    data.update(
+        {
+            "ticket": args.ticket,
+            "title": args.title,
+            "sprint": args.sprint,
+            "sprint_label": getattr(args, "sprint_label", args.sprint),
+            "basis": args.basis,
+            "activity": args.activity,
+            "qa": _qa_name(),
+            "ai_used": "Yes - Claude",
+            "started_at": _now(),
+            "notes": data.get("notes", []),
+        }
+    )
+    _save(args.ticket, data)
+    print(f"[qa_track] Started tracking {args.ticket} — sprint {args.sprint}")
+
+
+def cmd_count(args: argparse.Namespace) -> None:
+    data = _load(args.ticket)
+    if not data:
+        print(f"[qa_track] ERROR: no record for {args.ticket}. Run `start` first.", file=sys.stderr)
+        sys.exit(1)
+    data["manual"] = args.manual
+    data["automated"] = args.automated
+    data["reason"] = getattr(args, "reason", "")
+    data["counted_at"] = _now()
+    _save(args.ticket, data)
+    print(f"[qa_track] {args.ticket}: {args.manual} manual / {args.automated} automated")
+
+
+def cmd_note(args: argparse.Namespace) -> None:
+    data = _load(args.ticket)
+    if not data:
+        print(f"[qa_track] ERROR: no record for {args.ticket}.", file=sys.stderr)
+        sys.exit(1)
+    data.setdefault("notes", []).append({"ts": _now(), "text": args.text})
+    _save(args.ticket, data)
+    print(f"[qa_track] Note saved to {args.ticket}")
+
+
+def cmd_status(args: argparse.Namespace) -> None:
+    records = sorted(TRACKER_DIR.glob("*.json"))
+    if not records:
+        print("[qa_track] No records found.")
+        return
+    missing = []
+    for p in records:
+        d = json.loads(p.read_text())
+        if "manual" not in d or "automated" not in d:
+            missing.append(d.get("ticket", p.stem))
+    if missing:
+        print(f"[qa_track] Missing counts for: {', '.join(missing)}")
+    else:
+        print(f"[qa_track] All {len(records)} records are complete.")
+
+
+def cmd_report(args: argparse.Namespace) -> None:
+    records = [json.loads(p.read_text()) for p in TRACKER_DIR.glob("*.json")]
+    sprint_records = [
+        r for r in records if r.get("sprint") == args.sprint or r.get("sprint_label") == args.sprint
+    ]
+    if not sprint_records:
+        print(f"[qa_track] No records for sprint {args.sprint}.")
+        return
+
+    header = ["Ticket", "Title", "QA", "AI Used", "Basis", "Manual TCs", "Automated TCs", "Reason"]
+    rows = []
+    for r in sorted(sprint_records, key=lambda x: x.get("ticket", "")):
+        rows.append([
+            r.get("ticket", ""),
+            r.get("title", ""),
+            r.get("qa", ""),
+            r.get("ai_used", "Yes - Claude"),
+            r.get("basis", ""),
+            str(r.get("manual", "?")),
+            str(r.get("automated", "?")),
+            r.get("reason", ""),
+        ])
+
+    col_widths = [max(len(header[i]), max((len(row[i]) for row in rows), default=0)) for i in range(len(header))]
+    fmt = "  ".join(f"{{:<{w}}}" for w in col_widths)
+    sep = "  ".join("-" * w for w in col_widths)
+
+    print(f"\nSprint report — {args.sprint}\n")
+    print(fmt.format(*header))
+    print(sep)
+    for row in rows:
+        print(fmt.format(*row))
+    print()
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    parser = argparse.ArgumentParser(prog="qa_track", description="QA AI-usage tracker")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p_start = sub.add_parser("start")
+    p_start.add_argument("--ticket", required=True)
+    p_start.add_argument("--title", required=True)
+    p_start.add_argument("--sprint", required=True)
+    p_start.add_argument("--sprint-label")
+    p_start.add_argument("--basis", choices=["ac", "plan", "both"], required=True)
+    p_start.add_argument("--activity", required=True)
+
+    p_count = sub.add_parser("count")
+    p_count.add_argument("--ticket", required=True)
+    p_count.add_argument("--manual", type=int, required=True)
+    p_count.add_argument("--automated", type=int, required=True)
+    p_count.add_argument("--reason", default="")
+
+    p_note = sub.add_parser("note")
+    p_note.add_argument("--ticket", required=True)
+    p_note.add_argument("text")
+
+    sub.add_parser("status")
+
+    p_report = sub.add_parser("report")
+    p_report.add_argument("--sprint", required=True)
+
+    args = parser.parse_args()
+    dispatch = {
+        "start": cmd_start,
+        "count": cmd_count,
+        "note": cmd_note,
+        "status": cmd_status,
+        "report": cmd_report,
+    }
+    dispatch[args.command](args)
+
+
+if __name__ == "__main__":
+    main()
