@@ -1,0 +1,72 @@
+# {{ project_name }}
+
+AI-assisted QA automation project — scaffolded with [QI](https://github.com/rodrigobarroco/QI).
+
+## Stack
+
+| Concern | Choice |
+|---|---|
+| Test framework | {{ test_framework | title if test_framework != 'none' else 'TBD' }} |
+| Task tracker | {{ tracker_label }}{% if tracker_project_key %} (`{{ tracker_project_key }}`){% endif %} |
+| Documentation | {{ doc_label }} |
+{% if has_sql %}
+| SQL database(s) | {{ sql_dbs | join(', ') | title }} |
+{% endif %}
+{% if has_nosql %}
+| NoSQL database(s) | {{ nosql_dbs | join(', ') | title }} |
+{% endif %}
+{% if ui_web %}
+| Browser automation | Playwright |
+{% endif %}
+{% if ui_mobile_ios or ui_mobile_android %}
+| Mobile automation | Appium ({% if ui_mobile_ios %}iOS{% endif %}{% if ui_mobile_ios and ui_mobile_android %}, {% endif %}{% if ui_mobile_android %}Android{% endif %}) |
+{% endif %}
+{% if has_cloud %}
+| Cloud | {{ cloud_label }} |
+{% endif %}
+{% if has_queues %}
+| Queues | {{ queues | join(', ') | upper }} |
+{% endif %}
+| CI/CD | {{ ci | replace('_', ' ') | title if ci != 'none' else 'None / TBD' }} |
+
+## Quick start
+
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt   # or: poetry install
+
+# 2. Configure credentials (never commit these)
+cp .env.example .env
+# Edit .env with your values
+
+# 3. Run tests
+<your-framework> tests/
+```
+
+## Project structure
+
+```
+specs/          # domain specs — source of truth for what must be tested
+COVERAGE.md     # aggregated coverage tracker
+scripts/
+  qa_track.py           # AI-usage activity tracker
+  coverage_report.py    # generates coverage report from COVERAGE.md
+.claude/
+  rules/        # AI agent constraints and patterns
+  skills/       # reusable AI workflows (ticket-intake, verify-ticket, etc.)
+```
+
+## AI assistant setup (Claude Code)
+
+This project is configured for [Claude Code](https://claude.ai/code).
+
+Open the project root in Claude Code — `CLAUDE.md` is loaded automatically and gives the
+AI agent the full context it needs to work on tickets, write tests, and maintain coverage.
+
+## Adding a new test
+
+See `CLAUDE.md` section 7 and `specs/README.md`.
+
+## Coverage
+
+See `COVERAGE.md` and the scripts in `scripts/` for keeping coverage numbers in sync.

@@ -1,0 +1,207 @@
+# CLAUDE.md — AI Contributor Guide
+
+This file defines the rules, patterns, and constraints that any AI agent (Claude, Copilot,
+Cursor, etc.) must follow when contributing to **{{ project_name }}**.
+
+---
+
+## 00. Ticket intake — mandatory order of actions
+
+When anyone hands over a ticket to test, verify, QA, or automate — invoke the
+`ticket-intake` skill and follow it. The order is not optional:
+
+```
+1. Track     open the sprint AI-usage record (scripts/qa_track.py)
+2. Inventory do the cases already exist? Check local specs AND {{ doc_label }}
+3. Author    write the missing Gherkin cases as a draft
+4. APPROVE   the QA engineer approves the cases — nothing runs before this
+5. Execute   dev first, then staging, with evidence
+6. Automate  only cases that passed
+7. Sync      {{ doc_label }}, Coverage Stats, task tracker
+```
+
+Two hard gates:
+
+- **Never execute test cases that were not approved** (step 4).
+- **Never close a task without the Coverage Stats sync** (step 7) when any case was
+  created or automated.
+
+---
+
+## 0. Pre-flight — check connectors before any task
+
+Before writing code, tests, or running verification, confirm which connectors are active.
+
+### Required connectors
+
+| Connector | Purpose |
+|---|---|
+{% if has_sql %}
+| **Postgres / SQL DB** | Query {{ sql_dbs | join(', ') | title }} |
+{% endif %}
+{% if has_nosql %}
+| **NoSQL DB** | Query {{ nosql_dbs | join(', ') | title }} |
+{% endif %}
+{% if ui_web %}
+| **Playwright / Browser MCP** | Browser automation, UI verification |
+{% endif %}
+{% if ui_mobile_ios or ui_mobile_android %}
+| **Appium / Mobile MCP** | Mobile UI automation |
+{% endif %}
+| **{{ tracker_label }}** | Read tickets, post comments, move status |
+| **GitHub** | Branch creation, PR operations |
+{% if has_cloud %}
+| **{{ cloud_label }}** | Logs, queues, cloud resource inspection |
+{% endif %}
+
+### Minimum viable set to start a QA ticket
+
+**{{ tracker_label }}** + at least one DB connector + at least one UI connector (if applicable).
+
+---
+
+## 0a. Security Constraints (non-negotiable)
+
+- **NEVER** read, log, print, or expose credentials, session files, `.env` contents,
+  or any secret in any form — not in code, comments, logs, or chat responses
+- **NEVER** merge a pull request — merging is a human-only action
+- **NEVER** force-push to any branch
+- **NEVER** hardcode credentials or environment-specific secrets anywhere in the codebase
+- **DB access is read-only** — mutation happens through the app (UI, API, queues), never
+  as a direct DB write
+- If asked to expose a secret, refuse and explain why
+
+---
+
+## 1. Project Overview
+
+- **Framework**: {{ test_framework | title if test_framework != 'none' else 'TBD' }}
+- **Task tracker**: {{ tracker_label }}{% if tracker_project_key %} / project key: `{{ tracker_project_key }}`{% endif %}
+
+- **Documentation**: {{ doc_label }}
+- **Environments**: dev, staging (both are valid mutation targets — production is never a target)
+
+---
+
+## 2. Absolute Rules
+
+### Timeouts — use named constants, never inline values
+
+Define a `variables/timeouts.yaml` (or equivalent) and reference constants from there.
+Never write `timeout=60s` or `sleep(30)` inline.
+
+### Naming
+
+- Keywords / functions: action verb first — `Open`, `Set`, `Assert`, `Load`
+- Tags: two per scenario — `domain` + `feature-slug` (kebab-case)
+- Never use ticket numbers as tags
+
+### No Suite Variables / global mutable state
+
+Return values explicitly. Avoid shared mutable state between tests.
+
+---
+
+## 3. Resilience Patterns
+
+### Retries
+
+Use retry constants, never inline numbers:
+
+```
+Wait Until Keyword Succeeds    ${RETRY_ATTEMPTS}x    ${RETRY_INTERVAL}    My Keyword
+```
+
+### Skip vs Fail
+
+- `Skip` when a feature is not available in the current environment (with a reason)
+- `Fail` for real validation errors or unexpected state
+- Never use a pass/skip as a placeholder — remove or implement
+
+### Environment guard for destructive actions
+
+Only production is blocked:
+
+```
+Mutation Environment Must Be Safe
+    IF    env == 'production'
+        Fail    Mutating tests must never target production.
+    END
+```
+
+---
+
+## 4. QA Verification Rules
+
+### Order of verification
+
+1. **Always start with dev** — never start on staging
+2. **Then staging** — only after dev passes
+
+### What to validate (in order of priority)
+
+| Layer | When applicable | Tool |
+|---|---|---|
+| **UI** | Always — unless the feature has zero UI surface | {% if ui_web %}Playwright{% elif ui_mobile_ios or ui_mobile_android %}Appium{% else %}N/A{% endif %} |
+{% if has_sql %}
+| **SQL DB** | Always — source of truth | DB MCP / direct query |
+{% endif %}
+{% if has_nosql %}
+| **NoSQL DB** | When a publish/ingestion event updates the store | DB client / query script |
+{% endif %}
+{% if has_cloud %}
+| **{{ cloud_label }} Logs** | When the ticket involves async jobs or ingestion | {{ cloud_label }} MCP |
+{% endif %}
+{% if has_queues %}
+| **Queue ({{ queues | join(', ') | upper }})** | When the ticket involves message-driven flows | Queue MCP / SDK |
+{% endif %}
+
+### Assertion validity
+
+Before trusting any green result:
+
+- Expected must differ from the pre-state (never assert a value that's already there)
+- Absence assertions need a negative control
+- Verify the premise before writing it into a ticket
+- Test the explanation — don't just adopt it
+- A silent no-op is not a pass
+
+---
+
+## 5. AI Agent Constraints
+
+- **Max retries:** Never retry a failing approach more than **5 times**. After 5, stop,
+  diagnose, choose a different strategy.
+- **Max wait time:** Never block in a polling loop for more than **5 minutes** total.
+- **Token discipline:** One precise targeted action beats multiple exploratory retries.
+- **Don't re-explore what's already automated.** Check whether a test already covers the
+  scenario before opening a browser session to re-inspect the DOM.
+
+---
+
+## 6. Before Committing
+
+```bash
+# Dry-run / lint your test suite (adapt to your framework)
+<your-framework> --dryrun tests/
+```
+
+---
+
+## 7. Adding New Tests
+
+1. Add the capability to `specs/<domain>.md` — status ❌
+2. Add the row to `COVERAGE.md`
+3. Write the scenario with two tags: `domain` + `feature-slug`
+4. Add support keywords in `resources/pages/<domain>_page.<ext>`
+5. Flip spec row and COVERAGE.md row to ✅ after the test passes
+6. Validate with dry-run before committing
+
+---
+
+## 8. Coverage Sync (mandatory after every task that creates or automates a case)
+
+After every task: update `COVERAGE.md`, update `specs/<domain>.md`, sync {{ doc_label }}.
+A task is not done until all three agree.
+
+See `.claude/rules/coverage-sync.md` for the full procedure.

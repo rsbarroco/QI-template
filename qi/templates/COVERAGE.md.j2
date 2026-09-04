@@ -1,0 +1,40 @@
+# Coverage — {{ project_name }}
+
+Auto-generated summary: run `python scripts/coverage_report.py` to recompute.
+
+**Never edit the numbers by hand** — run the script and commit its output.
+
+## Summary
+
+| Total manual cases | Automated | Coverage % |
+|---|---|---|
+| 0 | 0 | 0% |
+
+> Baseline: project initialized with 0 test cases. Update after first cases are authored.
+
+---
+
+## By domain
+
+| Domain | Manual | Automated | % | Notes |
+|---|---|---|---|---|
+| *(add rows as domains are onboarded)* | — | — | — | — |
+
+---
+
+## Spec files
+
+Each domain has a `specs/<domain>.md` with the detailed feature inventory.
+Rows in the spec are the source of truth; this file aggregates their counts.
+
+## How to update
+
+1. Add/update rows in `specs/<domain>.md` (❌ → ✅ when a case is automated)
+2. Run `python scripts/coverage_report.py`
+3. Commit the updated COVERAGE.md alongside the test change
+
+## Sync with {{ doc_label }}
+
+After any change to coverage numbers, sync to {{ doc_label }} per
+`.claude/rules/coverage-sync.md`. Show old → new values and get an explicit approval
+before publishing.
