@@ -1,0 +1,50 @@
+from dataclasses import dataclass, field
+
+
+@dataclass
+class Config:
+    project_name: str = ""
+    project_slug: str = ""           # kebab-case, used in file paths
+
+    # Task / issue tracking
+    tracker: str = "none"            # jira | github_issues | linear | azure_devops | none
+    tracker_project_key: str = ""    # e.g. "PROJ", "my-org/my-repo"
+    doc_platform: str = "none"       # confluence | notion | github_wiki | none
+
+    # Databases
+    sql_dbs: list[str] = field(default_factory=list)    # postgres | mysql | sqlite | mssql
+    nosql_dbs: list[str] = field(default_factory=list)  # mongodb | redis | dynamodb | firestore
+
+    # UI / mobile
+    ui_web: bool = False
+    ui_mobile_ios: bool = False
+    ui_mobile_android: bool = False
+
+    # Test framework (advisory — the template is agnostic, but README uses it)
+    test_framework: str = "none"     # robot | playwright | cypress | jest | custom
+
+    # Infrastructure
+    cloud: str = "none"              # aws | gcp | azure | none
+    queues: list[str] = field(default_factory=list)  # sqs | pubsub | kafka | rabbitmq
+    ci: str = "none"                 # github_actions | gitlab_ci | jenkins | none
+
+    # Derived helpers
+    @property
+    def has_sql(self) -> bool:
+        return bool(self.sql_dbs)
+
+    @property
+    def has_nosql(self) -> bool:
+        return bool(self.nosql_dbs)
+
+    @property
+    def has_ui(self) -> bool:
+        return self.ui_web or self.ui_mobile_ios or self.ui_mobile_android
+
+    @property
+    def has_queues(self) -> bool:
+        return bool(self.queues)
+
+    @property
+    def has_cloud(self) -> bool:
+        return self.cloud != "none"
