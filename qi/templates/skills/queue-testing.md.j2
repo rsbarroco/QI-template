@@ -1,0 +1,151 @@
+# Skill: queue-testing
+
+Use this skill when testing message-driven flows via
+{{ queues | join(', ') | upper }}.
+
+## When to invoke
+
+- The AC involves sending a message to trigger a job or import
+- Verifying that an async pipeline consumed a message and produced the expected state
+- Debugging a silent no-op (message sent, nothing happened)
+
+## Safety rules
+
+- Always capture the **pre-state** from the DB before sending a message
+- Confirm queue depth is 0 (pipeline drained) before reading the **post-state**
+- Send one message at a time; wait for each to be fully processed before the next
+  (concurrent sends cause observation window contamination)
+- Never send to a production queue
+
+{% if 'sqs' in queues %}
+## SQS
+
+### Send a message
+
+```python
+import boto3, json
+
+sqs = boto3.client("sqs", region_name="us-east-1")
+
+payload = {
+    "items": [              # ← always wrap in the required top-level key
+        {
+            "id": "record-123",
+            "field": "value",
+        }
+    ]
+}
+
+sqs.send_message(
+    QueueUrl="https://sqs.us-east-1.amazonaws.com/123456789/my-dev-queue",
+    MessageBody=json.dumps(payload),
+)
+```
+
+### Check queue depth before reading post-state
+
+```python
+attrs = sqs.get_queue_attributes(
+    QueueUrl=queue_url,
+    AttributeNames=["ApproximateNumberOfMessages", "ApproximateNumberOfMessagesNotVisible"],
+)
+visible    = int(attrs["Attributes"]["ApproximateNumberOfMessages"])
+in_flight  = int(attrs["Attributes"]["ApproximateNumberOfMessagesNotVisible"])
+assert visible == 0 and in_flight == 0, f"Queue not drained: {visible} visible, {in_flight} in-flight"
+```
+
+**Critical gotchas:**
+- Standard queues do not guarantee ordering — if you send multiple messages rapidly, a
+  late-delivered earlier payload can overwrite a confirmed result
+- SQS always returns HTTP 200 on `send_message` — a "success" response does **not** mean
+  the consumer processed the message, only that it was enqueued
+- Always wrap the payload in the required top-level key — many consumers iterate a list
+  and silently process 0 items if the key is missing
+
+{% endif %}
+{% if 'pubsub' in queues %}
+## GCP Pub/Sub
+
+### Publish a message
+
+```python
+from google.cloud import pubsub_v1
+import json
+
+publisher = pubsub_v1.PublisherClient()
+topic_path = publisher.topic_path("my-project", "my-topic")
+
+data = json.dumps({"id": "record-123", "field": "value"}).encode()
+future = publisher.publish(topic_path, data)
+message_id = future.result()
+print(f"Published: {message_id}")
+```
+
+### Check subscription backlog
+
+```python
+from google.cloud import monitoring_v3
+
+# Or use the GCP MCP connector to query the subscription's undelivered message count
+# before reading the post-state
+```
+
+{% endif %}
+{% if 'kafka' in queues %}
+## Kafka
+
+### Produce a message
+
+```python
+from kafka import KafkaProducer
+import json
+
+producer = KafkaProducer(
+    bootstrap_servers=["broker:9092"],
+    value_serializer=lambda v: json.dumps(v).encode(),
+)
+
+producer.send("my-topic", value={"id": "record-123", "field": "value"})
+producer.flush()
+```
+
+### Verify consumer lag before reading post-state
+
+Use `kafka-consumer-groups.sh --describe` or the Kafka MCP connector to confirm
+consumer lag = 0 before asserting the DB state.
+
+{% endif %}
+{% if 'rabbitmq' in queues %}
+## RabbitMQ
+
+### Publish a message
+
+```python
+import pika, json
+
+connection = pika.BlockingConnection(pika.URLParameters(os.environ["RABBITMQ_URL"]))
+channel = connection.channel()
+channel.basic_publish(
+    exchange="my-exchange",
+    routing_key="my.routing.key",
+    body=json.dumps({"id": "record-123", "field": "value"}),
+)
+connection.close()
+```
+
+### Check queue depth before reading post-state
+
+Use the RabbitMQ Management API or MCP connector to confirm the queue is empty and the
+consumer has acknowledged the message before asserting DB state.
+
+{% endif %}
+
+## Evidence format
+
+```
+Queue:     my-dev-queue ({{ queues[0] | upper }})
+Payload:   { "items": [{ "id": "record-123", "field": "new-value" }] }
+Sent at:   2026-01-01T12:34:00Z
+Queue depth after send: 0 visible, 0 in-flight (confirmed at 12:35:10Z)
+DB post-state: { "id": "record-123", "field": "new-value" }  ✅
+```

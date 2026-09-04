@@ -1,0 +1,100 @@
+# Skill: cloud-logs
+
+Use this skill when verifying async jobs, ingestion events, or background processes
+via {{ cloud_label }} logs.
+
+## When to invoke
+
+- The AC involves an import, ingestion, or background processing job
+- A DB assertion shows a stale value and you suspect the pipeline hasn't run
+- You need a log line as evidence for the evidence table
+
+{% if cloud == 'aws' %}
+## AWS CloudWatch
+
+### Query logs
+
+```python
+import boto3, time
+
+logs = boto3.client("logs")
+
+response = logs.filter_log_events(
+    logGroupName="/ecs/my-service",
+    filterPattern='"record-id-123"',
+    startTime=int((time.time() - 300) * 1000),   # last 5 minutes
+    limit=20,
+)
+
+for event in response["events"]:
+    print(event["message"])
+```
+
+### Tail logs via MCP
+
+Use `aws_logs_tail` with the log group name and a filter pattern matching the record ID
+or operation name.
+
+### What to look for
+
+| Log pattern | Meaning |
+|---|---|
+| `200 OK` / `PROCESSED` | Job completed successfully |
+| `4xx` / `FAILED` / `ERROR` | Job rejected or failed — attach the full log line as evidence |
+| No log line at all | Job never received the message — check queue delivery |
+
+{% elif cloud == 'gcp' %}
+## GCP Cloud Logging
+
+### Query logs via MCP
+
+Use `query-logs` with a filter:
+
+```
+resource.type="cloud_run_revision"
+resource.labels.service_name="my-service"
+textPayload:"record-id-123"
+timestamp>="2026-01-01T00:00:00Z"
+```
+
+### What to look for
+
+| Log pattern | Meaning |
+|---|---|
+| `"status": 200` | Request completed |
+| `"status": 4xx/5xx` | Error — attach as evidence |
+| No matching log | Service may not have received the trigger — check Pub/Sub delivery |
+
+{% elif cloud == 'azure' %}
+## Azure Monitor
+
+Use the Azure MCP connector to query Application Insights or Log Analytics:
+
+```kusto
+traces
+| where timestamp > ago(5m)
+| where message contains "record-id-123"
+| project timestamp, message, severityLevel
+| limit 20
+```
+
+{% endif %}
+
+## Evidence format
+
+```
+Log group:  /ecs/my-service
+Filter:     "record-id-123"
+Timestamp:  2026-01-01T12:34:56Z
+Message:    "Processed record-id-123: status=completed, items=5"
+Env:        dev  ✅
+```
+
+## Gotchas
+
+| Symptom | Likely cause |
+|---|---|
+| No log line found | Pipeline lag — wait and re-query; or message never delivered |
+| "Success" log but no DB change | Silent no-op — check payload shape (see `json-schema` skill) |
+| Log found in dev but not staging | Different log group name or routing configuration |
+| Query times out | Too broad a time range — narrow to the last 5–10 minutes around the event |

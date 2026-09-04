@@ -1,0 +1,62 @@
+# Skill: mobile
+
+Use this skill when testing, verifying, or automating mobile interactions on
+{% if ui_mobile_ios and ui_mobile_android %}iOS and Android{% elif ui_mobile_ios %}iOS{% else %}Android{% endif %}.
+
+## Tool to use
+
+Use the Appium MCP connector (`appium_*` tools) — not a desktop browser automation tool.
+
+## Session setup
+
+```
+1. select_device       → choose simulator/emulator or real device
+2. appium_session_management (action=create)  → start a session
+3. navigate to the feature under test
+4. run the scenario steps
+5. appium_session_management (action=delete)  → close session
+```
+
+## Locator hierarchy (most to least preferred)
+
+```
+accessibility id        → most stable, maps to accessibilityIdentifier (iOS) / contentDescription (Android)
+id                      → resource-id (Android) / name (iOS)
+xpath                   → use only when nothing else works; prefer short paths
+```
+
+## Evidence rules
+
+- Screenshot every Given/When/Then step (use `appium_screenshot`)
+- Screenshots capture the full device screen — annotate which element is the focus if
+  the region is not obvious
+- Save screenshots under `evidence/<TICKET-KEY>/<scenario-slug>/`
+
+{% if ui_mobile_ios %}
+## iOS-specific notes
+
+- Test on the iOS Simulator (Xcode) before real device
+- Use `prepare_ios_simulator` before the first session if the simulator is cold
+- Accessibility IDs are the most reliable locator — ask devs to add them if missing
+- Gestures: use `appium_gesture` (tap, swipe, scroll); `appium_perform_actions` for
+  complex multi-touch
+
+{% endif %}
+{% if ui_mobile_android %}
+## Android-specific notes
+
+- Test on the Android Emulator (AVD) before real device
+- `contentDescription` is the closest equivalent to iOS `accessibilityIdentifier`
+- Use `appium_mobile_keyboard` for text input on Android (avoid direct `send_keys` for
+  special characters)
+
+{% endif %}
+
+## Common gotchas
+
+| Symptom | Likely cause |
+|---|---|
+| Element not found | App not fully loaded — add an explicit wait |
+| Intermittent tap failure | Element partially obscured by keyboard — scroll it into view |
+| Session fails to create | Simulator/emulator not booted — call `prepare_ios_simulator` or start AVD |
+| Wrong screen after action | Navigation animation still in progress — wait for the target screen's marker element |

@@ -1,0 +1,108 @@
+# Skill: nosql-query
+
+Use this skill to query {{ nosql_dbs | join(', ') | title }} during QA verification.
+
+## When to invoke
+
+- Confirming a document was written/updated after a publish or ingestion event
+- Checking that an async pipeline propagated a change to the NoSQL store
+- Asserting a document's field value matches the expected state
+- Debugging a discrepancy between the SQL source of truth and the NoSQL read store
+
+## Safety rules (mandatory)
+
+- **Read-only** — never write or delete via the test tooling
+- **No schema changes** — never drop collections or indexes
+- Never log connection strings, credentials, or tokens
+- Use the project's query helper script (`scripts/nosql_query.py` or equivalent)
+  rather than a raw shell command that could expose the URI
+
+## Query patterns
+
+{% if 'mongodb' in nosql_dbs %}
+### MongoDB
+
+```python
+from scripts.nosql_query import NoSQLQuery
+
+client = NoSQLQuery(env="dev")   # reads URI from env var, never from args
+
+# Point lookup — always prefer exact ID over regex (regex on large collections times out)
+doc = client.find_one("my_collection", {"_id": "exact-id-value"})
+
+# Field-level assertion
+assert doc["status"] == "active", f"Expected active, got {doc.get('status')}"
+```
+
+**Key gotchas:**
+- Use exact `_id` lookups; avoid regex queries on large collections — they will time out
+- Documents may nest fields: `doc["parent"]["child"]`, not `doc["child"]`
+- One document per logical record is not guaranteed — a publish event may produce N docs
+  (one per locale, channel, or variant); assert the right one
+
+{% endif %}
+{% if 'redis' in nosql_dbs %}
+### Redis
+
+```python
+import redis
+
+r = redis.from_url(os.environ["REDIS_URL"])   # never hardcode
+
+value = r.get("cache:key:identifier")
+assert value is not None, "Key not found — cache may not have been populated yet"
+assert value.decode() == "expected_value"
+```
+
+**Key gotchas:**
+- A missing key may mean the write hasn't happened yet (async) — poll with a timeout
+- TTL expiry can cause flaky reads; check `r.ttl(key)` if results are intermittent
+
+{% endif %}
+{% if 'dynamodb' in nosql_dbs %}
+### DynamoDB
+
+```python
+import boto3
+
+table = boto3.resource("dynamodb").Table("my-table")
+item = table.get_item(Key={"pk": "partition-key", "sk": "sort-key"})["Item"]
+assert item["status"] == "active"
+```
+
+**Key gotchas:**
+- Always provide both partition key and sort key (if table has one) — partial keys return nothing
+- Use `ProjectionExpression` to fetch only the fields you need on large items
+- DynamoDB is eventually consistent — use `ConsistentRead=True` for post-mutation checks
+
+{% endif %}
+
+## Absence assertion (with negative control)
+
+Before concluding "document does not exist":
+
+1. Prove the query reaches data — find **any** document in the collection
+2. Then assert the specific document is absent
+
+An empty result with no negative control may mean the collection is empty, the query has
+a typo, or the connection is wrong — not that the document is clean.
+
+## Result format for evidence
+
+```
+Collection:  my_collection
+Query:       { "_id": "record-123" }
+Result:      { "_id": "record-123", "status": "active", "updatedAt": "2026-01-01T00:00:00Z" }
+Env:         dev
+Expected:    status = "active"  ✅
+```
+
+## Propagation lag
+
+NoSQL read stores fed by async pipelines lag behind the SQL source of truth. A correct
+SQL value paired with a stale NoSQL value is usually a propagation timing issue, not a
+bug. Confirm:
+
+1. The async job/pipeline completed (queue depth = 0, no pending jobs)
+2. Wait for the propagation window, then re-read
+3. If still stale after waiting — that is a real bug worth reporting

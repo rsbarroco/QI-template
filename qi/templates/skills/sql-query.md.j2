@@ -1,0 +1,73 @@
+# Skill: sql-query
+
+Use this skill to write and validate SQL queries for {{ sql_dbs | join(', ') | title }}
+during QA verification.
+
+## When to invoke
+
+- Confirming a DB state after a UI mutation or API call
+- Checking that a field was written correctly after an ingestion/import event
+- Asserting absence (with a negative control — see `.claude/rules/assertion-validity.md` rule 2)
+- Debugging a discrepancy between the UI and the actual stored value
+
+## Safety rules (mandatory)
+
+- **Read-only credentials only** — never use an admin or write-capable connection
+- **No direct writes** — mutation goes through the application layer
+- **No schema changes** — never ALTER, DROP, or CREATE anything
+- If the query returns credentials, tokens, PII, or secrets, stop immediately and do not
+  log the output
+
+## Query patterns
+
+### Confirm a field was written
+
+```sql
+SELECT <column>
+FROM   <table>
+WHERE  <id_column> = '<value>'
+LIMIT  1;
+```
+
+Always capture the **pre-state** before mutating, then compare to **post-state**.
+
+### Absence assertion (with negative control)
+
+```sql
+-- First prove the query CAN return rows (negative control)
+SELECT COUNT(*) FROM <table>;   -- should be > 0
+
+-- Then assert absence for the specific condition
+SELECT COUNT(*) FROM <table>
+WHERE <condition>;              -- assert this is 0
+```
+
+Never accept zero rows as evidence without first proving the query reaches data.
+
+### Cross-environment note
+
+{% if sql_dbs | length > 1 %}
+This project uses {{ sql_dbs | join(' and ') | title }}. Use the correct connector /
+connection string per environment — never mix dev and staging credentials.
+{% endif %}
+
+Dev and staging may have different data populations. A result that differs between them is
+not necessarily a bug — always record the environment alongside the query result.
+
+## Result format for evidence
+
+```
+Query:    SELECT status FROM orders WHERE id = '12345'
+Result:   [{ "status": "completed" }]
+Env:      dev
+Expected: status = "completed"  ✅
+```
+
+## Common gotchas
+
+| Symptom | Likely cause |
+|---|---|
+| Zero rows, expected data | Wrong table name, wrong column, wrong env |
+| Stale value after mutation | Query ran before async job completed — wait and retry |
+| Column doesn't exist error | Schema differs between dev and staging |
+| Timeout | Missing index on WHERE clause — add `LIMIT 1` for point lookups |

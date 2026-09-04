@@ -1,0 +1,71 @@
+# Skill: web-ui
+
+Use this skill when testing, verifying, or automating web browser interactions.
+
+## When to invoke
+
+- Verifying a UI-facing acceptance criterion
+- Writing or updating a browser-automation test
+- Investigating a visual discrepancy or broken interaction
+- Generating screenshot evidence for a ticket
+
+## Tool to use
+
+Use the Playwright MCP connector (or your configured browser automation tool).
+Do **not** re-explore the DOM if a test already covers the scenario — check
+`.claude/rules/test-execution-path.md` first.
+
+## Evidence rules
+
+For every Given / When / Then step:
+
+1. Take a screenshot **after** inputs are filled/selected, **before** the action
+2. Take a follow-up screenshot **after** the action showing the result (success/error/redirect)
+3. Every dropdown scenario needs a screenshot per option exercised
+4. A passed UI step without a screenshot does not count as verified
+
+## Locator hierarchy (most to least preferred)
+
+```
+role / aria-label        → role=button[name="Save"]
+data-testid              → [data-testid="submit-btn"]
+id                       → #submit-btn
+semantic CSS             → button.primary
+XPath                    → use only when nothing else works
+```
+
+Declare locators as constants at the top of the file — never inline in keywords/steps.
+
+## Strict mode & scope
+
+Scope locators to the active section/panel to avoid ambiguity:
+
+```python
+# Playwright (Python)
+panel = page.locator('[data-testid="details-panel"]')
+panel.get_by_label("Name").fill("Test value")
+```
+
+## Cross-browser note
+
+Run dev verification in one browser (Chromium by default). Staging verification should
+ideally cover a second browser (Firefox or WebKit) for any UI-facing AC.
+
+## Common gotchas
+
+| Symptom | Likely cause |
+|---|---|
+| Element not found | Page not loaded, wrong locator, wrong env URL |
+| Intermittent failures | Race condition — add an explicit wait for the element |
+| Action succeeds but no change | Save button re-enabled on backend rejection — check for error banners |
+| Screenshot shows wrong state | Screenshot taken too early — wait for network idle |
+
+## Screenshot evidence naming
+
+```
+given-01-<state-description>.png
+when-01-<action-description>.png
+then-01-<expected-result>.png
+```
+
+Store under `evidence/<TICKET-KEY>/<scenario-slug>/`.
