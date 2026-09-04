@@ -10,8 +10,8 @@ QA, assertion validity, coverage tracking, and AI-usage reporting.
 ## Install
 
 ```bash
-pip install git+https://github.com/rodrigobarroco/QI
-# or: pipx install git+https://github.com/rodrigobarroco/QI
+pip install git+https://github.com/rsbarroco/QI-template
+# or: pipx install git+https://github.com/rsbarroco/QI-template
 ```
 
 ## Usage
@@ -20,46 +20,36 @@ pip install git+https://github.com/rodrigobarroco/QI
 qi my-project-tests
 ```
 
-QI asks 10 questions about your stack and generates a project directory with everything
-configured for your choices.
+QI presents a series of selection menus (use arrow keys + space/enter). No free text —
+each question has a fixed list of options to choose from.
+
+### Questions and available options
+
+| Question | Options |
+|---|---|
+| **Task tracker** | Jira / GitHub Issues / Linear / Azure DevOps / None |
+| **Documentation platform** | Confluence / Notion / GitHub Wiki / None |
+| **SQL databases** | PostgreSQL / MySQL / SQLite / MS SQL Server *(multi-select)* |
+| **NoSQL databases** | MongoDB / Redis / DynamoDB / Firestore *(multi-select)* |
+| **UI surfaces** | Web (browser) / Mobile — iOS / Mobile — Android *(multi-select)* |
+| **Test framework** | Robot Framework / Playwright / Cypress / Jest / Custom / None |
+| **Cloud provider** | AWS / GCP / Azure / None |
+| **Async queues** | SQS / Pub-Sub / Kafka / RabbitMQ *(multi-select)* |
+| **CI/CD** | GitHub Actions / GitLab CI / Jenkins / None |
+
+Selecting "None" for any question skips the related files — only what's relevant to your
+stack gets generated.
+
+### Options
 
 ```
-$ qi acme-qa
-  ╭────────────────────────────────────────╮
-  │  QI — Quality Intelligence             │
-  │  Scaffold an AI-assisted QA project.  │
-  ╰────────────────────────────────────────╯
+qi [OUTPUT_DIR] [--dry-run]
 
-  Project name? Acme QA
-  Task tracker? Jira
-  Jira project key? ACME
-  Documentation platform? Confluence
-  SQL databases? PostgreSQL
-  NoSQL databases? MongoDB
-  UI surfaces? Web (browser)
-  Test framework? Playwright
-  Cloud provider? AWS
-  Async queues? SQS
-  CI/CD? GitHub Actions
-
-  create  CLAUDE.md
-  create  .claude/rules/assertion-validity.md
-  create  .claude/skills/ticket-intake.md
-  create  .claude/skills/sql-query.md
-  create  .claude/skills/web-ui.md
-  create  .claude/skills/queue-testing.md
-  create  .github/workflows/tests.yml
-  ... (24 files total)
-
-  ╭──────────────────────────────────────────────────────╮
-  │  Done! Project created at acme-qa/                  │
-  │                                                      │
-  │  Next steps:                                         │
-  │    cd acme-qa                                        │
-  │    git init                                          │
-  │    # Open in Claude Code and read CLAUDE.md          │
-  ╰──────────────────────────────────────────────────────╯
+  OUTPUT_DIR    Where to create the project (default: ./<project-slug>)
+  --dry-run     Print the file list without writing any files
 ```
+
+---
 
 ## What gets generated
 
@@ -75,6 +65,7 @@ $ qi acme-qa
 | `.claude/rules/connection-validation.md` | Pre-flight connector checklist |
 | `.claude/rules/coverage-sync.md` | Keeping coverage numbers in sync |
 | `.claude/rules/feedback-loop.md` | Post-session debrief process |
+| `.claude/rules/reusable-test-data.md` | Reusable E2E test data pattern |
 | `.claude/skills/ticket-intake.md` | 8-step QA intake workflow |
 | `.claude/skills/verify-ticket.md` | Verification loop (RTM → evidence → transition) |
 | `.claude/skills/gap-analysis.md` | Coverage gap analysis |
@@ -84,27 +75,28 @@ $ qi acme-qa
 | `scripts/coverage_report.py` | Recomputes COVERAGE.md from specs |
 | `specs/README.md` | How to write domain specs |
 
-### Generated conditionally (based on your stack)
+### Generated conditionally (based on your answers)
 
 | Condition | File |
 |---|---|
-| SQL database selected | `.claude/skills/sql-query.md` |
-| NoSQL database selected | `.claude/skills/nosql-query.md` |
+| Any SQL database selected | `.claude/skills/sql-query.md` |
+| Any NoSQL database selected | `.claude/skills/nosql-query.md` |
 | Web UI selected | `.claude/skills/web-ui.md` |
-| Mobile (iOS/Android) selected | `.claude/skills/mobile.md` |
-| Cloud provider selected | `.claude/skills/cloud-logs.md` |
-| Async queue selected | `.claude/skills/queue-testing.md` |
-| GitHub Actions CI | `.github/workflows/tests.yml` |
-| GitLab CI | `.gitlab-ci.yml` |
+| iOS or Android selected | `.claude/skills/mobile.md` |
+| AWS / GCP / Azure selected | `.claude/skills/cloud-logs.md` |
+| Any queue selected | `.claude/skills/queue-testing.md` |
+| GitHub Actions selected | `.github/workflows/tests.yml` |
+| GitLab CI selected | `.gitlab-ci.yml` |
 
-## Options
+---
 
-```
-qi [OUTPUT_DIR] [--dry-run]
+## Adding new options
 
-  OUTPUT_DIR    Where to create the project (default: ./<project-slug>)
-  --dry-run     Print the file list without writing anything
-```
+The available choices live in [`qi/prompts.py`](qi/prompts.py). To add a new tracker,
+database, or cloud provider, add a `questionary.Choice` to the relevant list and update
+the corresponding Jinja2 template in [`qi/templates/`](qi/templates/).
+
+---
 
 ## Design principles
 
@@ -114,11 +106,13 @@ qi [OUTPUT_DIR] [--dry-run]
 - **Proven patterns** — rules and skills derived from real QA work, not theory
 - **Portable** — install from git anywhere; no registry account needed
 
+---
+
 ## Development
 
 ```bash
-git clone https://github.com/rodrigobarroco/QI
-cd QI
+git clone https://github.com/rsbarroco/QI-template
+cd QI-template
 pip install -e ".[dev]"
 pytest tests/ -v
 ```
