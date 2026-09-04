@@ -1,0 +1,150 @@
+# Skill: ticket-intake
+
+Invoke this skill whenever a ticket is handed over to test, verify, QA, or automate —
+including a bare ticket key with no other instruction.
+
+## Mandatory order — do not skip steps, do not reorder
+
+```
+Step 1  TRACK      open the sprint AI-usage record
+Step 2  INVENTORY  does coverage already exist?
+Step 3  AUTHOR     write the missing Gherkin cases as a draft
+Step 4  APPROVE    QA engineer approves — nothing runs before this
+Step 5  EXECUTE    dev first, then staging, with evidence
+Step 6  AUTOMATE   only cases that passed
+Step 7  SYNC       doc platform + coverage + task tracker
+```
+
+---
+
+## Step 1 — Track
+
+```bash
+python scripts/qa_track.py start \
+  --ticket <TICKET-KEY> \
+  --title "<ticket summary>" \
+  --sprint <sprint-id> \
+  --basis ac|plan|both \
+  --activity qa,automation
+```
+
+`--basis` is what was actually read to derive the cases:
+- `ac` — only the ticket's Acceptance Criteria
+- `plan` — only an implementation plan, PR diff, or dev design
+- `both` — AC and implementation were both used
+
+---
+
+## Step 2 — Inventory (gap analysis)
+
+Before writing any new case, check what already exists:
+
+1. Search `specs/<domain>.md` for the ticket's feature area — list every row
+2. Search `tests/` for existing test cases covering the ACs
+3. Check the coverage page in {{ doc_label }}
+
+Classify each AC:
+- ✅ Covered — a test exists and the AC text still matches its `[Documentation]`
+- ⚠️ Partial — a test exists but the AC changed, or coverage is incomplete
+- ❌ Not covered — no test exists
+
+**Decision tree:**
+- All ✅ → skip to Step 5 (reuse path)
+- Any ⚠️ or ❌ → proceed to Step 3
+
+---
+
+## Step 3 — Author Gherkin cases
+
+Write one scenario per AC, in Gherkin (Given/When/Then/And).
+
+Rules:
+- Describe observable behavior, not implementation details
+- Each scenario must be traceable to an AC number
+- Two tags per scenario: `domain` + `feature-slug` (kebab-case, never ticket numbers)
+- Show the draft — do not proceed until Step 4 is complete
+
+---
+
+## Step 4 — APPROVE (hard gate)
+
+**Nothing runs. Nothing is published. Until the QA engineer explicitly says yes.**
+
+Present the Gherkin draft and wait for approval. If the engineer asks for changes, revise
+and re-present. Only proceed to Step 5 after an explicit "approved" or equivalent.
+
+---
+
+## Step 5 — Execute
+
+Classify each AC per the decision tree from Step 2, then pick the path:
+
+| RTM status | Path |
+|---|---|
+| ✅ Covered, AC unchanged | **A — Reuse**: run existing suite, gather evidence |
+| ✅ Covered, AC changed | **B — Extend**: update the test, then run |
+| ⚠️ Partial | **B — Extend**: add the missing branch, then run |
+| ❌ Not covered | **C — Full flow**: write test → dryrun → execute |
+
+**Order:** dev first, then staging. Never start on staging.
+
+Evidence required for every AC:
+{% if ui_web or ui_mobile_ios or ui_mobile_android %}
+- UI screenshot or mobile screenshot (for any UI-facing AC)
+{% endif %}
+{% if has_sql %}
+- SQL query result confirming the expected DB state
+{% endif %}
+{% if has_nosql %}
+- NoSQL document dump confirming the expected store state
+{% endif %}
+{% if has_cloud %}
+- {{ cloud_label }} log line for async/ingestion ACs
+{% endif %}
+
+---
+
+## Step 6 — Automate
+
+Only automate cases that **passed** in Step 5.
+
+1. Add the feature row to `specs/<domain>.md` — status ❌
+2. Write the test case (framework: {{ test_framework | title if test_framework != 'none' else 'your framework' }})
+3. Run with `--dryrun` (or equivalent) to validate syntax
+4. Run for real — confirm green
+5. Flip the spec row to ✅
+
+---
+
+## Step 7 — Sync
+
+After every automated case:
+
+1. Run `python scripts/coverage_report.py`
+2. Update `COVERAGE.md`
+3. Update `specs/<domain>.md`
+4. Sync to {{ doc_label }} — show old → new, get approval, then publish
+5. Post a comment on the ticket with the evidence table and coverage delta
+6. Transition the ticket:
+{% if tracker == 'jira' %}
+   - Dev pass → **QA Passed - Dev**
+   - Staging pass → **Pending Prod Deployment** (or your team's equivalent)
+{% elif tracker == 'github_issues' %}
+   - Add `qa-passed-dev` / `qa-passed-staging` labels as appropriate
+{% else %}
+   - Move the ticket to the appropriate "QA Passed" state in {{ tracker_label }}
+{% endif %}
+
+---
+
+## Step 8 — Close tracking record
+
+```bash
+python scripts/qa_track.py count \
+  --ticket <TICKET-KEY> \
+  --manual <N> \
+  --automated <M> \
+  --reason "<why remainder was not automated, if M < N>"
+```
+
+Report the counts in the response so they can be corrected on the spot.

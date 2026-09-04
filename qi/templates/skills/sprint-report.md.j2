@@ -1,0 +1,43 @@
+# Skill: sprint-report
+
+Generate the end-of-sprint QA AI-usage report from the activity tracker.
+
+## When to invoke
+
+At the end of each sprint (or on demand), to produce the report sent to the team/manager.
+
+## Step 1 — Verify the tracker is up to date
+
+```bash
+python scripts/qa_track.py status
+```
+
+Look for any record that is still missing `--manual` or `--automated` counts. Fill them
+in before generating the report — never generate from incomplete data.
+
+## Step 2 — Generate the report
+
+```bash
+python scripts/qa_track.py report --sprint <sprint-id>
+```
+
+The report outputs a table with one row per ticket:
+
+| Ticket | Title | Manual TCs | Automated TCs | Basis | Reason (if automated < manual) |
+|---|---|---|---|---|---|
+| TICKET-1 | ... | N | M | ac/plan/both | ... |
+
+## Step 3 — Review for accuracy
+
+Before sending:
+
+- Count only what actually exists. If tests were planned but not written, they are not
+  automated test cases.
+- Never invent a number to fill a cell. Leave it at 0 and say so.
+- The tracked time is **assisted wall-clock time** — not the total time on the ticket,
+  not human hours per activity. Never present it as either.
+
+## Step 4 — Distribute
+
+Share the report with the team via {{ tracker_label }} or {{ doc_label }}, per your
+team's sprint review process.

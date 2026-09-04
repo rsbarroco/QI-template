@@ -1,0 +1,57 @@
+# Skill: gap-analysis
+
+Use this skill to perform a standalone coverage gap analysis for a ticket or feature area,
+before Step 3 of ticket-intake (or on demand).
+
+## Input
+
+Ticket key + feature description, or a list of ACs.
+
+## Step 1 — Pull the ACs
+
+Fetch the ticket from {{ tracker_label }}:
+{% if tracker == 'jira' %}
+- Project: `{{ tracker_project_key }}`
+- Read fields: `summary`, `description`, `acceptance criteria`, `validation steps`
+{% elif tracker == 'github_issues' %}
+- Repo: `{{ tracker_project_key }}`
+- Read the issue body for acceptance criteria and validation steps
+{% else %}
+- Read the ticket's acceptance criteria / validation steps from {{ tracker_label }}
+{% endif %}
+
+## Step 2 — Search existing coverage
+
+For each AC:
+
+1. Check `specs/<domain>.md` — does a row exist for this feature?
+2. Search `tests/` for test files covering this AC (by tag, keyword, or description)
+3. Check the coverage page in {{ doc_label }}
+
+## Step 3 — Classify
+
+| AC | Spec row | Test exists | AC text matches | Classification |
+|---|---|---|---|---|
+| AC1 | ✅/❌ | ✅/❌ | ✅/❌ | ✅ Covered / ⚠️ Partial / ❌ Not covered |
+
+## Step 4 — Report gaps
+
+For every ⚠️ or ❌ row:
+
+- State what is missing (entire case, specific branch, specific environment)
+- Estimate effort: Low / Medium / High
+- Propose a scenario (Gherkin draft, one sentence per step)
+
+## Step 5 — Proposed scenarios (draft)
+
+```gherkin
+Feature: <feature name>
+
+  Scenario: <AC title>
+    Given <precondition>
+    When <action>
+    Then <expected outcome>
+```
+
+These are drafts — do not proceed to execution until Step 4 of ticket-intake
+(approval gate) is cleared.

@@ -1,0 +1,121 @@
+# Skill: verify-ticket
+
+Use this skill during Step 5 (Execute) of ticket-intake. It runs the full verification
+loop for a ticket that has already been approved (Step 4 passed).
+
+## Step 0 — Pre-flight
+
+### 0a. Connection check
+
+Verify all required connectors are active before doing anything else. See
+`.claude/rules/connection-validation.md`.
+
+### 0b. RTM — build the requirements-traceability matrix
+
+For every AC in the ticket:
+
+1. Search `specs/<domain>.md` for any row mentioning this feature
+2. Search `tests/` for test files with a `[Documentation]` block referencing this AC
+3. Classify: ✅ Covered / ⚠️ Partial / ❌ Not covered
+
+Output the RTM as a table before proceeding.
+
+---
+
+## Step 1 — Dev environment
+
+### 1a. UI verification
+{% if ui_web %}
+- Open the dev app in the browser
+- Navigate to the feature under test
+- Screenshot each Given/When/Then step
+- Confirm the AC's expected behavior is visible
+{% elif ui_mobile_ios or ui_mobile_android %}
+- Launch the dev app on the {% if ui_mobile_ios %}iOS{% endif %}{% if ui_mobile_ios and ui_mobile_android %} / {% endif %}{% if ui_mobile_android %}Android{% endif %} simulator/device
+- Navigate to the feature under test
+- Screenshot each Given/When/Then step
+{% else %}
+- No UI surface for this project — skip if the feature has no frontend
+{% endif %}
+
+### 1b. DB verification
+{% if has_sql %}
+- Query {{ sql_dbs | join(' / ') | title }} to confirm the expected state:
+  ```sql
+  -- Example: SELECT <columns> FROM <table> WHERE <condition>
+  ```
+- Capture the full result set as evidence
+{% endif %}
+{% if has_nosql %}
+- Query {{ nosql_dbs | join(' / ') | title }} to confirm the expected document state
+- Document the query and the full result
+{% endif %}
+
+### 1c. Async verification (if applicable)
+{% if has_queues %}
+- If the AC involves a queue ({{ queues | join(', ') | upper }}): confirm the message
+  was delivered and processed before reading the DB state
+- Check queue depth is 0 before asserting final state
+{% endif %}
+{% if has_cloud %}
+- {{ cloud_label }} logs: find the relevant log line (timestamp + endpoint + status)
+  and attach it to the evidence table
+{% endif %}
+
+---
+
+## Step 2 — Staging environment
+
+Run the same verification sequence as Step 1 against the staging environment.
+
+**Important:**
+- Start with dev — never start on staging
+- Only proceed to staging after dev passes
+- Use the same test data from the reusable registry when available
+- DB assertion limitations vary by environment — document any skipped layer with a reason
+
+---
+
+## Step 3 — Evidence table
+
+Build the final evidence table:
+
+| # | AC | Test Case | Env | Result | Evidence |
+|---|---|---|---|---|---|
+| TC-1 | AC1 | description | dev | ✅ | `<log line or query result>` |
+| TC-1 | AC1 | description | staging | ✅ | `<log line or query result>` |
+
+---
+
+## Step 4 — Ticket comment draft
+
+Draft the comment for the ticket. Show it to the QA engineer for approval before posting.
+
+Template:
+```
+**QA Verification — {{ project_name }}**
+
+Environment: dev ✅ / staging ✅
+
+| AC | Test Case | Result | Evidence |
+|---|---|---|---|
+| AC1 | ... | ✅ | ... |
+
+**Coverage delta:** X manual / Y automated
+**Next step:** [transition to appropriate status]
+```
+
+---
+
+## Step 5 — Transition
+
+After the QA engineer approves the comment and the transition:
+
+{% if tracker == 'jira' %}
+- Dev pass → transition to **QA Passed - Dev**
+- Staging pass → transition to **Pending Prod Deployment**
+- Any failure → transition to **QA Failed** with the evidence attached
+{% else %}
+- Move the ticket to the appropriate "QA Passed" state in {{ tracker_label }}
+- Any failure → move to "QA Failed" and attach the evidence
+{% endif %}

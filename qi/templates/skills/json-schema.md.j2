@@ -1,0 +1,77 @@
+# Skill: json-schema
+
+Use this skill when verifying API request/response payloads, queue messages, or any
+JSON structure against an expected contract.
+
+## When to invoke
+
+- Verifying that an API response matches the documented contract
+- Checking that a queue message ({% if has_queues %}{{ queues | join(', ') | upper }}{% else %}any broker{% endif %}) has the expected shape
+- Asserting that a DB export / transformation preserves required fields
+- Investigating a silent no-op (the payload was accepted but nothing happened)
+
+## Step 1 — Capture the actual payload
+
+Capture the full JSON from the source:
+
+```python
+import json
+
+# From an API response
+response = requests.get(url, headers=headers)
+payload = response.json()
+print(json.dumps(payload, indent=2))
+
+# From a queue message body
+message_body = json.loads(sqs_message["Body"])
+print(json.dumps(message_body, indent=2))
+```
+
+## Step 2 — Define the expected schema
+
+Use `jsonschema` (Python) to declare the contract:
+
+```python
+schema = {
+    "type": "object",
+    "required": ["id", "status", "items"],
+    "properties": {
+        "id":     {"type": "string"},
+        "status": {"type": "string", "enum": ["active", "inactive"]},
+        "items":  {"type": "array", "minItems": 1},
+    },
+}
+```
+
+## Step 3 — Validate
+
+```python
+from jsonschema import validate, ValidationError
+
+try:
+    validate(instance=payload, schema=schema)
+    print("Schema valid ✅")
+except ValidationError as e:
+    print(f"Schema invalid ❌ — {e.message} at {list(e.path)}")
+```
+
+## Step 4 — Silent no-op check
+
+If validation passes but the system did nothing:
+
+1. Confirm the payload was actually **received** (check the server/queue receipt, not
+   just the send result — SQS, Pub/Sub, and Kafka all return success on delivery even if
+   the consumer rejected the message silently).
+2. Check for a **required wrapper key** — many consumers iterate a top-level list
+   (e.g. `{"items": [...]}`) and silently process 0 records if the key is absent.
+3. Check that **ID fields match** existing records — a correctly shaped payload with a
+   mismatched identifier mutates nothing and returns no error.
+
+## Common gotchas
+
+| Symptom | Root cause |
+|---|---|
+| "Accepted" response but no DB change | Required wrapper key missing or wrong field name |
+| Schema validates but wrong field values | Enum constraint missing from schema |
+| Intermittent failures | Concurrent writes; see `.claude/rules/assertion-validity.md` rule 6 |
+| Empty array response | Querying the wrong table / collection name (absence assertion — needs negative control) |
