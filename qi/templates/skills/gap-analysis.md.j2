@@ -16,6 +16,12 @@ Fetch the ticket from {{ tracker_label }}:
 {% elif tracker == 'github_issues' %}
 - Repo: `{{ tracker_project_key }}`
 - Read the issue body for acceptance criteria and validation steps
+{% elif tracker == 'linear' %}
+- Team: `{{ tracker_project_key }}`
+- Read the issue description and sub-issues for acceptance criteria
+{% elif tracker == 'azure_devops' %}
+- Project: `{{ tracker_project_key }}`
+- Read the work item's Acceptance Criteria field and description
 {% else %}
 - Read the ticket's acceptance criteria / validation steps from {{ tracker_label }}
 {% endif %}
